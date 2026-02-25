@@ -1,0 +1,1 @@
+# CapturaDados-python
