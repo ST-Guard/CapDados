@@ -5,26 +5,35 @@ import time
 import os
 
 while True:
-    agora = datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S") # Data e horário da máquina formatado
+    momento = datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S") # Data e horário da máquina formatado
 
-    cpuPorcentagem = psutil.cpu_percent(interval=1) # Porcentagem de uso da cpu
-
+    freq =  psutil.cpu_freq()
+    cpuUsoFreq = freq.current # Uso da CPU em MHz
+    cpuMaxFreq = freq.max # Frequência máxima da CPU em MHz
+    cpuNuclesLogi = psutil.cpu_count(logical=True) # Conta a quantidade de núcles lógicos
+    cpuPorcUso = psutil.cpu_percent(interval=1) # Porcentagem de uso da cpu
+    
     ram = psutil.virtual_memory()
-    ramUso = ram.used
+    ramTotal = ram.total # Total da RAM em bytes
+    ramUso = ram.used # Uso da RAM em bytes
+    ramPorcUso = ram.percent # Uso da RAM em porcetagem
 
     disco = psutil.disk_usage('C:/')
-    discoUso = disco.used
-
-    rede = psutil.net_if_stats()
-    veloWifi = rede['Wi-Fi'].speed
-
+    dicosTotal = disco.total # Total da Disco em bytes
+    discoUso = disco.used # Uso da Disco em bytes
+    discoUsoPorc = disco.percent # Uso da Disco em porcetagem
 
     registroAtual = {
-        'horarioData': [agora],
-        'cpuPorcentagemUso': [cpuPorcentagem],
-        'ramBytesUso': [ramUso],
-        'discoBytesUso': [discoUso],
-        'velocidadeMbWifi': [veloWifi]
+        'horarioData': [momento],
+        'cpuUsoFreq': [cpuUsoFreq],
+        'cpuMaxFreq': [cpuMaxFreq],
+        'cpuPorcUso': [cpuPorcUso],
+        'ramTotal': [ramTotal],
+        'ramUso': [ramUso],
+        'ramPorcUso': [ramPorcUso],
+        'dicosTotal': [dicosTotal],
+        'discoUso': [discoUso],
+        'discoPorcUso': [discoUsoPorc],
     }
 
     df = pd.DataFrame(registroAtual)
