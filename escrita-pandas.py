@@ -40,4 +40,4 @@ while True:
     # mode=a para adicionar nova linha e header=not para não adicionar o header novamente
     df.to_csv("dadosMonitorados.csv", mode='a', header=not os.path.exists("dadosMonitorados.csv"), index=False)
 
-    time.sleep(2)
+    time.sleep(10)
