@@ -4,7 +4,7 @@ import os
 registro = pd.read_csv("dadosMonitorados.csv")
 
 dataHora = pd.to_datetime(registro["horarioData"], dayfirst=True) # Transformando coluna horarioData em tipo datetime
-limite = pd.Timestamp.now() - pd.offsets.Minute(5) # Pegando a ultima uma hora com a função .offsets (lida com viradas de hora, dia e ate ano)
+limite = pd.Timestamp.now() - pd.offsets.Minute(10) # Pegando a ultima uma hora com a função .offsets (lida com viradas de hora, dia e ate ano)
 
 registroUltimo10min = registro[dataHora >= limite]
 
