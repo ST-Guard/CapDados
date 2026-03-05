@@ -36,6 +36,8 @@ while True:
         'discoPorcUso': [discoUsoPorc],
     }
 
+    print("Registro de ",momento, " armazenado!")
+
     df = pd.DataFrame(registroAtual)
     # mode=a para adicionar nova linha e header=not para não adicionar o header novamente
     df.to_csv("dadosMonitorados.csv", mode='a', header=not os.path.exists("dadosMonitorados.csv"), index=False)
