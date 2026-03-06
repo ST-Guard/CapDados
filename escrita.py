@@ -19,7 +19,7 @@ while True:
     ramPorcUso = ram.percent # Uso da RAM em porcetagem
 
     disco = psutil.disk_usage('C:/')
-    dicosTotal = disco.total # Total da Disco em bytes
+    discoTotal = disco.total # Total da Disco em bytes
     discoUso = disco.used # Uso da Disco em bytes
     discoUsoPorc = disco.percent # Uso da Disco em porcetagem
 
@@ -31,12 +31,23 @@ while True:
         'ramTotal': [ramTotal],
         'ramUso': [ramUso],
         'ramPorcUso': [ramPorcUso],
-        'dicosTotal': [dicosTotal],
+        'dicosTotal': [discoTotal],
         'discoUso': [discoUso],
         'discoPorcUso': [discoUsoPorc],
     }
 
-    print("Registro de ",momento, " armazenado!")
+    print(f"""
+        Data: {momento}
+        Frequência de uso da CPU: {cpuUsoFreq} Mhz
+        Frequência máxima da CPU: {cpuMaxFreq} Mhz
+        Porcentagem de uso da CPU: {cpuPorcUso} %
+        Capacidade de processamento total da RAM: {ramTotal} bytes
+        Capacidade de processamento de uso da RAM: {ramUso} bytes
+        Porcentagem da capacidade de processamento de uso da RAM: {ramPorcUso} %
+        Capacidade de armazenamnto total do Disco: {discoTotal} bytes
+        Capacidade de armazenamnto de uso do Disco: {discoUso} bytes
+        Porcentagem capacidade de armazenamnto de uso do Disco: {discoUsoPorc} %
+        """)
 
     df = pd.DataFrame(registroAtual)
     # mode=a para adicionar nova linha e header=not para não adicionar o header novamente
