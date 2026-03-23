@@ -1,0 +1,61 @@
+import psutil
+import csv
+from datetime import datetime
+import time
+
+arquivo_csv = "dados-brutos_maquina.csv"
+
+print("""\033[33m
+  /$$$$$$                                      /$$     /$$$$$$$              /$$              
+ /$$__  $$                                    | $$    | $$__  $$            | $$              
+| $$  \__/ /$$$$$$/$$$$   /$$$$$$   /$$$$$$  /$$$$$$  | $$  \ $$  /$$$$$$  /$$$$$$    /$$$$$$ 
+|  $$$$$$ | $$_  $$_  $$ |____  $$ /$$__  $$|_  $$_/  | $$  | $$ |____  $$|_  $$_/   |____  $$
+ \____  $$| $$ \ $$ \ $$  /$$$$$$$| $$  \__/  | $$    | $$  | $$  /$$$$$$$  | $$      /$$$$$$$
+ /$$  \ $$| $$ | $$ | $$ /$$__  $$| $$        | $$ /$$| $$  | $$ /$$__  $$  | $$ /$$ /$$__  $$
+|  $$$$$$/| $$ | $$ | $$|  $$$$$$$| $$        |  $$$$/| $$$$$$$/|  $$$$$$$  |  $$$$/|  $$$$$$$
+ \______/ |__/ |__/ |__/ \_______/|__/         \___/  |_______/  \_______/   \___/   \_______/
+                                                                                              
+                                                                                              
+                                                                                              
+
+\033[m""")
+
+
+
+with open(arquivo_csv, 'a', newline='') as csvfile:
+    while(True): 
+        colunas = ['USER','CPU','RAM_TOTAL','RAM_USADA','RAM_PERCENT','DISCO_TOTAL','DISCO_USADO','DISCO_PERCENT','RPM_FAN', 'TEMP_PC', 'QTD_PR','DATA_HORA']
+        CSV_DIC_WRITER = csv.DictWriter(csvfile, fieldnames=colunas, delimiter=';')
+        
+        if csvfile.tell() == 0:
+            CSV_DIC_WRITER.writeheader()
+
+        cpu_usage = psutil.cpu_percent(interval=1)
+        ram = psutil.virtual_memory() 
+        disk = psutil.disk_usage("/")
+        tempo_agora = datetime.now()
+        rpm_fan = psutil.sensors_fans()['acpi_fan'][0].current # devera ser mudado a chave dependendo do computador
+        temperatura_computador = psutil.sensors_temperatures()['nvme'][0].current # deve ser mudado dependendo do computador
+        contagem_processos = len(psutil.pids())
+        print(f"Escrevendo dados: \n CPU: {cpu_usage}\n RAM_TOTAL: {ram.total} : RAM_USADA: {ram.used} : RAM_PORCENTAGEM: {ram.percent}\n DISCO_TOTAL: {disk.total} : DISCO_USADA: {disk.used} : DISCO_PORCENTAGEM: {disk.percent}\n TEMPERATURA: {temperatura_computador} RPM_FANS: {rpm_fan} QUANTIDADE PROCESSOS {contagem_processos}  \n DATA_HORA: {tempo_agora}")
+        print()
+        dados_dict =  {
+            'USER': 'Matheus V.',
+            'CPU': cpu_usage, 
+            'RAM_TOTAL': ram.total, 
+            'RAM_USADA': ram.used, 
+            'RAM_PERCENT': ram.percent, 
+            'DISCO_TOTAL': disk.total,
+            'DISCO_USADO': disk.used, 
+            'DISCO_PERCENT': disk.percent,
+            'RPM_FAN': rpm_fan,
+            'TEMP_PC': temperatura_computador,
+            'QTD_PR': contagem_processos, 
+            'DATA_HORA': tempo_agora}
+
+        CSV_DIC_WRITER.writerow(dados_dict)
+        csvfile.flush()
+
+    
+       
+        time.sleep(5)
