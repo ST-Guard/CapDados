@@ -3,6 +3,7 @@ from datetime import timedelta
 import time 
 import csv
 
+
 print("""\033[33m
   /$$$$$$                                      /$$     /$$$$$$$              /$$              
  /$$__  $$                                    | $$    | $$__  $$            | $$              
@@ -20,6 +21,8 @@ print("""\033[33m
 
 
 caminho_csv = 'dados-brutos_maquina.csv'
+
+
 
 while True: 
 
@@ -163,8 +166,10 @@ while True:
     
         CSV_DIC_WRITER.writerow(escrita_dados)
         csvfile.flush()
-        
+    
     time.sleep(10)
-
+    #SUBINDO O ARQUIV
     
 
+
+    

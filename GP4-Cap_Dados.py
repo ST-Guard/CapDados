@@ -2,8 +2,12 @@ import psutil
 import csv
 from datetime import datetime
 import time
+import boto3
+import os
 
-arquivo_csv = "dados-brutos_maquina.csv"
+
+
+arquivo_csv = "dados-brutos.csv"
 
 print("""\033[33m
   /$$$$$$                                      /$$     /$$$$$$$              /$$              
@@ -21,6 +25,22 @@ print("""\033[33m
 \033[m""")
 
 
+def upload_file(file_name, bucket, object_name=None):
+    session = boto3.client(
+        's3',
+        aws_access_key_id='',
+        aws_secret_access_key='',
+        aws_session_token=''
+    )
+    # If S3 object_name was not specified, use file_name
+    if object_name is None:
+        object_name = os.path.basename(file_name)
+
+    try:
+        response = session.upload_file(file_name, bucket, object_name)
+    except:
+        return False
+    return True
 
 with open(arquivo_csv, 'a', newline='') as csvfile:
     while(True): 
@@ -34,8 +54,8 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
         ram = psutil.virtual_memory() 
         disk = psutil.disk_usage("/")
         tempo_agora = datetime.now()
-        rpm_fan = psutil.sensors_fans()['acpi_fan'][0].current # devera ser mudado a chave dependendo do computador
-        temperatura_computador = psutil.sensors_temperatures()['nvme'][0].current # deve ser mudado dependendo do computador
+        rpm_fan = psutil.sensors_fans()['acpi_fan'][0].current 
+        temperatura_computador = psutil.sensors_temperatures()['nvme'][0].current 
         contagem_processos = len(psutil.pids())
         print(f"Escrevendo dados: \n CPU: {cpu_usage}\n RAM_TOTAL: {ram.total} : RAM_USADA: {ram.used} : RAM_PORCENTAGEM: {ram.percent}\n DISCO_TOTAL: {disk.total} : DISCO_USADA: {disk.used} : DISCO_PORCENTAGEM: {disk.percent}\n TEMPERATURA: {temperatura_computador} RPM_FANS: {rpm_fan} QUANTIDADE PROCESSOS {contagem_processos}  \n DATA_HORA: {tempo_agora}")
         print()
@@ -57,5 +77,8 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
         csvfile.flush()
 
     
-       
+        upload_file('dados-brutos.csv','buckte-teste-sptech-gabrielmr', 'raw/dados-brutos.csv')
         time.sleep(5)
+
+
+
