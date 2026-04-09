@@ -37,7 +37,7 @@ def upload_file(file_name, bucket, object_name=None):
     )
     # If S3 object_name was not specified, use file_name
     if object_name is None:
-        object_name = os.path.basename('')
+        object_name = os.path.basename('/home/valle/Área de trabalho/Caculo computacional/CapDados/dados-brutos_maquina.csv')
 
     try:
         response = session.upload_file(file_name, bucket, object_name)
@@ -157,7 +157,7 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
 
 
 
-        print(f"Escrevendo dados: \n CPU: {cpu_usage}\n RAM_TOTAL: {ram.total} : RAM_USADA: {ram.used} : RAM_PORCENTAGEM: {ram.percent}\n DISCO_TOTAL: {disk.total} : DISCO_USADA: {disk.used} : DISCO_PORCENTAGEM: {disk.percent}\n QUANTIDADE PROCESSOS {contagem_processos}  \n DATA_HORA: {tempo_agora}")
+       
         print()
         dados_dict =  {
             'EMPRESA': 'GOGE', 
@@ -189,10 +189,33 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
             'PROCESSO3_RAM': top_terceiro_processo_ram['nome'], 
             'PORCENTAGEM_PROCESSO3_RAM': top_terceiro_processo_ram['memoria'].rss,  
             'DATA_HORA': tempo_agora}
+        
+
+        print(f"""
+        ----------------CAPTURANDO   DADOS ----------------
+        {tempo_agora}
+        CPU: {cpu_usage}
+        RAM: {ram.percent}
+        DISCO: {disk.percent}
+        TEMPERATURA: {temperatura_pc}
+
+        LATENCIA {ping}
+        PACOTES ENVIADOS: {pacotes_enviados}
+        PACOTES RECEBIDOS: {pacotes_recebidos}
+
+
+        QUANTIDADE DE PROCESSOS: {contagem_processos}
+        PROCESSO COM MAIOR CONSUMO DE CPU: {top_maior_processo_cpu['nome']}  {top_maior_processo_cpu['cpu']}%
+        PROCESSO COM MAIOR CONSUMO DE RAM: {top_maior_processo_ram['nome']}  {top_maior_processo_cpu['memoria'].rss}%
+
+        ----------------------------------------------------
+
+
+""")
 
         CSV_DIC_WRITER.writerow(dados_dict)
         csvfile.flush()
-        upload_file('dados-brutos_maquina.csv','s3-smartdata-2026-06-04-teste', 'bronze/dados-brutos_maquina.csv')
+        upload_file('dados-brutos_maquina.csv','s3-smartdata-2026-06-04-teste', 'raw/dados-brutos_maquina.csv')
 
 
 
