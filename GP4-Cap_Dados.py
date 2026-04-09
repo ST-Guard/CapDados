@@ -48,12 +48,18 @@ def upload_file(file_name, bucket, object_name=None):
 
 
 
+
+
+
+
+
+
 with open(arquivo_csv, 'a', newline='') as csvfile:
     while(True): 
         colunas = ['EMPRESA','REGIAO', 'DATACENTER', 'ZONA', 'SERVIDOR','CPU','RAM_TOTAL','RAM_USADA','RAM_PERCENT','DISCO_TOTAL','DISCO_USADO','DISCO_PERCENT', 'LATENCIA', 'PACOTES_ENVIADOS', 'PACOTES_RECEBIDOS', 
                    'QTD_PR','PROCESSO1_CPU', 'PORCENTAGEM_PROCESSO1_CPU','PROCESSO2_CPU', 'PORCENTAGEM_PROCESSO2_CPU', 'PROCESSO3_CPU', 'PORCENTAGEM_PROCESSO3_CPU'
                    ,'PROCESSO1_RAM', 'PORCENTAGEM_PROCESSO1_RAM','PROCESSO2_RAM', 'PORCENTAGEM_PROCESSO2_RAM', 'PROCESSO3_RAM', 'PORCENTAGEM_PROCESSO3_RAM'  
-                   ,'DATA_HORA']
+                   ,'QTD_NUCLEOS', 'USO_USER', 'USO_SISTEM', 'MEMORIA_CACHE', 'MEMORIA_LIVRE', 'MEMORIA_DISPONIVEL','DATA_HORA']
         CSV_DIC_WRITER = csv.DictWriter(csvfile, fieldnames=colunas, delimiter=';')
         
         if csvfile.tell() == 0:
@@ -71,6 +77,8 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
 
         # pegando hora e contagem de processos
         tempo_agora = datetime.now()
+        dia = tempo_agora.strftime('%D %H:%M:%S %A')
+        tempo_agora = f"{dia}"
         contagem_processos = len(psutil.pids())
 
 
@@ -84,6 +92,29 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
         dados_internet = psutil.net_io_counters()
         pacotes_enviados = dados_internet.packets_sent
         pacotes_recebidos = dados_internet.packets_recv
+
+
+
+
+
+        qtd_nucleos = psutil.cpu_count(logical=False)
+
+
+        # pegando porcentagens especificas
+
+        uso_cpu = psutil.cpu_times_percent(interval=1)
+
+        uso_user = uso_cpu.user
+        uso_sistema = uso_cpu.system
+
+
+        memoria = psutil.virtual_memory()
+        cache = memoria.cached + memoria.buffers
+        livre = memoria.free
+        disponivel = memoria.available
+
+
+
         
         
         
@@ -154,7 +185,7 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
        
         print()
         dados_dict =  {
-            'EMPRESA': 'GOGE', 
+            'EMPRESA': 'STEAM', 
             'REGIAO': 'A1',
             'DATACENTER': 'DATA_CENTER_01',
             'ZONA': 'A1',
@@ -181,7 +212,13 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
             'PROCESSO2_RAM': top_segundo_processo_ram['nome'], 
             'PORCENTAGEM_PROCESSO2_RAM': top_segundo_processo_ram['memoria'].rss, 
             'PROCESSO3_RAM': top_terceiro_processo_ram['nome'], 
-            'PORCENTAGEM_PROCESSO3_RAM': top_terceiro_processo_ram['memoria'].rss,  
+            'PORCENTAGEM_PROCESSO3_RAM': top_terceiro_processo_ram['memoria'].rss,
+            'QTD_NUCLEOS': qtd_nucleos,
+            'USO_USER':  uso_user,
+            'USO_SISTEM': uso_sistema,
+            'MEMORIA_CACHE': cache,
+            'MEMORIA_LIVRE': livre, 
+            'MEMORIA_DISPONIVEL': disponivel,     
             'DATA_HORA': tempo_agora}
         
 

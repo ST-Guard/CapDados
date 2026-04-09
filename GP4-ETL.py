@@ -130,14 +130,14 @@ while True:
 
     # pegando o usuario atual
 
-    usuario_atual = dados_brutos['USER'][qtd_linha_atual + 1]
+    usuario_atual = dados_brutos['EMPRESA'][qtd_linha_atual + 1]
 
     # criando o csv com os dados tratados
 
     arquivo_csv = 'dados_tratados_maquina.csv'
 
     with open(arquivo_csv, 'a', newline='') as csvfile:
-        colunas = ['USER', 'MEDIA_CPU','PICO_CPU', 'MEDIA_RAM', 'PICO_RAM','PORCENTAGEM_RAM', 'PICO_P_RAM', 'MEDIA_DISCO', 'PICO_DISCO', 'PORCENTAGEM_DISCO', 'PICO_P_DISCO']
+        colunas = ['EMPRESA', 'MEDIA_CPU','PICO_CPU', 'MEDIA_RAM', 'PICO_RAM','PORCENTAGEM_RAM', 'PICO_P_RAM', 'MEDIA_DISCO', 'PICO_DISCO', 'PORCENTAGEM_DISCO', 'PICO_P_DISCO']
         CSV_DIC_WRITER = csv.DictWriter(csvfile, fieldnames=colunas, delimiter=';')
 
         if csvfile.tell() == 0:
@@ -161,7 +161,7 @@ while True:
 
         """)
 
-        escrita_dados = {'USER': usuario_atual, 'MEDIA_CPU': mediapercentcpu, 'PICO_CPU': picopercentcpu, 'MEDIA_RAM': mediaram, 'PICO_RAM': picoram, 'PORCENTAGEM_RAM': mediapercentram, 'PICO_P_RAM': picopercentram, 
+        escrita_dados = {'EMPRESA': usuario_atual, 'MEDIA_CPU': mediapercentcpu, 'PICO_CPU': picopercentcpu, 'MEDIA_RAM': mediaram, 'PICO_RAM': picoram, 'PORCENTAGEM_RAM': mediapercentram, 'PICO_P_RAM': picopercentram, 
                          'MEDIA_DISCO': mediadisco, 'PICO_DISCO': picodisco, 'PORCENTAGEM_DISCO': mediapercentdisco, 'PICO_P_DISCO': picopercentdisco  }
     
         CSV_DIC_WRITER.writerow(escrita_dados)
