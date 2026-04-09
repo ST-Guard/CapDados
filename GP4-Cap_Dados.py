@@ -2,7 +2,7 @@ import psutil
 import csv
 from datetime import datetime
 import time
-import speedtest
+import speedtest # baixar como pip install speedtest-cli
 import boto3 
 import os
 
@@ -67,12 +67,6 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
         ram = psutil.virtual_memory() 
         disk = psutil.disk_usage("/")
 
-
-        #pegando temperatura computador
-        funcao_temperatura = psutil.sensors_temperatures()
-        chave_computador = list(funcao_temperatura.keys())[0]
-        temperatura_pc = psutil.sensors_temperatures()[chave_computador][0].current 
-        
 
 
         # pegando hora e contagem de processos
@@ -197,7 +191,6 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
         CPU: {cpu_usage}
         RAM: {ram.percent}
         DISCO: {disk.percent}
-        TEMPERATURA: {temperatura_pc}
 
         LATENCIA {ping}
         PACOTES ENVIADOS: {pacotes_enviados}
