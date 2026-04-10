@@ -56,10 +56,10 @@ def upload_file(file_name, bucket, object_name=None):
 
 with open(arquivo_csv, 'a', newline='') as csvfile:
     while(True): 
-        colunas = ['EMPRESA','REGIAO', 'DATACENTER', 'ZONA', 'SERVIDOR','CPU','RAM_TOTAL','RAM_USADA','RAM_PERCENT','DISCO_TOTAL','DISCO_USADO','DISCO_PERCENT', 'LATENCIA', 'PACOTES_ENVIADOS', 'PACOTES_RECEBIDOS', 
+        colunas = ['EMPRESA','REGIAO', 'DATACENTER', 'ZONA', 'SERVIDOR','CPU','RAM_TOTAL','RAM_USADA','RAM_PERCENT','DISCO_TOTAL','DISCO_USADO','DISCO_PERCENT', 'LATENCIA', 'PACOTES_ENVIADOS', 'PACOTES_RECEBIDOS', 'PACOTES_PERDIDOS', 
                    'QTD_PR','PROCESSO1_CPU', 'PORCENTAGEM_PROCESSO1_CPU','PROCESSO2_CPU', 'PORCENTAGEM_PROCESSO2_CPU', 'PROCESSO3_CPU', 'PORCENTAGEM_PROCESSO3_CPU'
                    ,'PROCESSO1_RAM', 'PORCENTAGEM_PROCESSO1_RAM','PROCESSO2_RAM', 'PORCENTAGEM_PROCESSO2_RAM', 'PROCESSO3_RAM', 'PORCENTAGEM_PROCESSO3_RAM'  
-                   ,'QTD_NUCLEOS', 'USO_USER', 'USO_SISTEM', 'MEMORIA_CACHE', 'MEMORIA_LIVRE', 'MEMORIA_DISPONIVEL','SWAP_TOTAL','SWAP_USADA', 'SWAP_LIVRE', 'SWAP_PERCENT','DATA_HORA']
+                   ,'QTD_NUCLEOS', 'USO_USER', 'USO_SISTEM', 'MEMORIA_CACHE', 'MEMORIA_LIVRE', 'MEMORIA_DISPONIVEL','SWAP_TOTAL','SWAP_USADA', 'SWAP_LIVRE', 'SWAP_PERCENT','BOOTTIME', 'DATA_HORA']
         CSV_DIC_WRITER = csv.DictWriter(csvfile, fieldnames=colunas, delimiter=';')
         
         if csvfile.tell() == 0:
@@ -85,6 +85,8 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
         #pegando rede
         instancia_speed_test = speedtest.Speedtest(secure=True)
         instancia_speed_test.get_best_server()
+        bootime = psutil.boot_time()
+
 
         ping = instancia_speed_test.results.ping
 
@@ -92,7 +94,8 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
         dados_internet = psutil.net_io_counters()
         pacotes_enviados = dados_internet.packets_sent
         pacotes_recebidos = dados_internet.packets_recv
-
+        pacotes_perdidos = dados_internet.errin + dados_internet.errout
+ 
 
 
 
@@ -119,7 +122,7 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
         swap_livre = swap.free
         swap_percent = swap.percent
         
-        print(swap)
+        
         
         # pegando processos com maior consumo
 
@@ -202,7 +205,8 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
             'DISCO_PERCENT': disk.percent,
             'LATENCIA': ping, 
             'PACOTES_ENVIADOS': pacotes_enviados, 
-            'PACOTES_RECEBIDOS': pacotes_recebidos,  
+            'PACOTES_RECEBIDOS': pacotes_recebidos,
+            'PACOTES_PERDIDOS': pacotes_perdidos,  
             'QTD_PR': contagem_processos,
             'PROCESSO1_CPU': top_maior_processo_cpu['nome'], 
             'PORCENTAGEM_PROCESSO1_CPU': top_maior_processo_cpu['cpu'],
@@ -225,7 +229,8 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
             'SWAP_USADA': swap_usada,
             'SWAP_LIVRE': swap_livre,
             'SWAP_PERCENT': swap_percent, 
-            'MEMORIA_DISPONIVEL': disponivel,     
+            'MEMORIA_DISPONIVEL': disponivel,
+            'BOOTTIME': bootime,     
             'DATA_HORA': tempo_agora}
         
 

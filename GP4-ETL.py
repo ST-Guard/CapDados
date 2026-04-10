@@ -168,8 +168,126 @@ while True:
         csvfile.flush()
     
     time.sleep(10)
-    #SUBINDO O ARQUIV
+
+
+    """
+----------------------------------------------------------------------INFORMÇÔES QUE O ETL VAI BUSCAR ****GESTOR PT1--
+KPI
+Processo com maior consumo (VARCHAR)
+Quantidade de alertas (INT)
+Indice de Confiança para Manutenção Preventiva (ICMP) (%)
+Servidores Ativos (INT)
+Servidores Inativos (INT)
+
+Tendencia de degradação (DIARIA)(ULTIMO 30 DIAS) {
+29/03: {QTD_SOBRECARREADO: 30, QTD_ESTRESSADOS: 20},
+28/03: {QTD_SOBRECARREADO: 30, QTD_ESTRESSADOS: 20},
+29/03: {QTD_SOBRECARREADO: 30, QTD_ESTRESSADOS: 20}
+....
+}
+
+Pico de Uso Semanal (DIARIA)(DIA SEMANA){
+CPU:   {PICO_MAXIMO: 91%, PICO_MEDIO: 77%, PICO_ MINIMO: 30%, SEG: 30%,TER: 20% . . .},
+RAM:   {PICO_MAXIMO: 91%, PICO_MEDIO: 77%, PICO_ MINIMO: 30%, SEG: 30%,TER: 20% . . .},
+DISCO: {PICO_MAXIMO: 91%, PICO_MEDIO: 77%, PICO_ MINIMO: 30%, SEG: 30%,TER: 20% . . .},
+}
+
+
+****GESTOR PT2
+--KPI
+Processo com maior consumo (VARCHAR)
+Quantidade de alertas (INT)
+Indice de Confiança para Manutenção Preventiva (ICMP) (%)
+Servidores Ativos (INT)
+Servidores Inativos (INT)
+
+Uso de Disco vs Rede (HORA)(ULTIMO 24 HRS) {
+00:00: {UsoDisco: 30%, TrafegoRede: 20%},
+03:00: {UsoDisco: 50%, TrafegoRede: 30%},
+05:00: {UsoDisco: 70%, TrafegoRede: 20%},
+...
+}
+Pico de Disco (%)
+Horário do pico de Disco (VARCHAR)
+Pico de Rede (%)
+Horário do pico de Rede (VARCHAR)
+
+Tempo de atividade vc Latência (HORA)(ULTIMO 24 HRS) {
+00:00: {Uptime: 30%, Latencia: 20%},
+03:00: {Uptime: 50%, Latencia: 30%},
+05:00: {Uptime: 70%, Latencia: 20%},
+...
+}
+Servidor com menor UPTIME (VARCHAR)
+Horário do servidor com menor UPTIME (VARCHAR)
+Pico de Latência (MS)
+
+Servidores online (INT)
+Servidores críticos (INT)
     
 
 
+
+************************ANALISTA************************
+----KPI
+
+Total de servidores (INT)
+Servidores inativos (INT)
+P99 da RAM (%)
+P99 do CPU (%)
+Uso do Disco (%)
+Uso do Disco (TB)
+Total do Disco (TB)
+Qtd de servidores com baixa latência (INT)
+
+
+
+--Gráficos
+
+
+Servidores_críticos(ORDENADO){
+SERVIDOR1: {USO_CPU: 90%, USO_RAM: 90%},
+SERVIDOR1: {USO_CPU: 80%, USO_RAM: 80%},
+...
+}
+qtd total servidores (INT)
+
+TOP3_PROCESSOS_USO_RAM(ORDENADO){
+processo1: {USO_GB: 90, %TOTAL: 41},
+processo2: {USO_GB: 80, %TOTAL: 31},
+processo3: {USO_GB: 50, %TOTAL: 21},
+}
+Soma do TOP3 GB (FLOAT)
+Porcentagem da soma do TOP3 GB (%)
+
+
+TOP3_PROCESSOS_USO_CPU(ORDENADO){
+processo1: {USO_GB: 90, %TOTAL: 41},
+processo2: {USO_GB: 80, %TOTAL: 31},
+processo3: {USO_GB: 50, %TOTAL: 21},
+}
+Porcentagem da soma do TOP3 GB (%)
+
+
+Monitoramento_uso_recursos(ULTIMAS 24HRS){
+00:00: {media_uso_ram: 30%, media_uso_disco: 40%, media_uso_cpu: 10%, latencia: 30ms},
+01:00: {media_uso_ram: 30%, media_uso_disco: 40%, media_uso_cpu: 10%, latencia: 30ms},
+02:30: {media_uso_ram: 30%, media_uso_disco: 40%, media_uso_cpu: 10%, latencia: 30ms},
+....
+}
+
+
+
+
+
+
+
+SPOILER ESPECIFICA
+Quantidade de servidores com uso de CPU de mais de 90% (INT)
+Indice de servidores com a RAM disponível menor que 5% (INT)
+
     
+""" 
+
+
+
