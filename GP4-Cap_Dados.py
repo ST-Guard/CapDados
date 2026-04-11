@@ -27,7 +27,6 @@ print("""\033[33m
 
 
 
-
 def upload_file(file_name, bucket, object_name=None):
     session = boto3.client(
         's3',
@@ -191,7 +190,7 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
        
         print()
         dados_dict =  {
-            'EMPRESA': 'STEAM', 
+            'EMPRESA': 'Steam', 
             'REGIAO': 'A1',
             'DATACENTER': 'DATA_CENTER_01',
             'ZONA': 'A1',
@@ -257,7 +256,7 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
 
         CSV_DIC_WRITER.writerow(dados_dict)
         csvfile.flush()
-        upload_file('dados-brutos_maquina.csv','s3-smartdata-2026-06-04-teste', 'raw/dados-brutos_maquina.csv')
+        upload_file('dados-brutos_maquina.csv','s3-smart-data-teste', 'raw/dados-brutos_maquina.csv')
 
 
 

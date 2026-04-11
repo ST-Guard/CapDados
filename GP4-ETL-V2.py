@@ -26,13 +26,13 @@ print("""\033[33m
 
 
 
-# MYSQL///////////////////
+# acesso ao banco de dados
 
 conexao = mysql.connector.connect(
     host="127.0.0.1",  
-    database="smartdata",
-    user="",
-    password="",
+    database="smartData",
+    user="root",
+    password="030979@Ma",
     port="3306"  
 )
 cursor = conexao.cursor()
@@ -48,7 +48,7 @@ conexao.close()
 
 
 
-# BUCKET////////////////////////
+# acesso ao bucket
 
 s3_cliente = boto3.client(
     's3',
@@ -57,7 +57,7 @@ s3_cliente = boto3.client(
     aws_session_token=''
 )
 
-s3_cliente.download_file('smartdatabucket', 'raw/dados-brutos.csv', 'dados-brutos.csv')
+s3_cliente.download_file('s3-smart-data-teste', 'raw/dados-brutos_maquina.csv', 'dados-brutos_maquina.csv')
 print(f"Arquivo dados-brutos.csv baixado com sucesso.")
 
 
@@ -72,57 +72,200 @@ def upload_file(file_name, bucket, object_name=None):
     return True
 
 
-caminho_csv = 'dados-brutos.csv'
+caminho_csv = 'dados-brutos_maquina.csv'
 dados_brutos = pd.read_csv(caminho_csv, sep=';')
 
-################################################################################TRATANDO OS DADOS PARA O TRATED NO BUCKETE
+
+
+
+    
+
+
+# tratando os dados para o treated
 limite_tempo = pd.Timestamp.now() - timedelta(minutes=5)
 qtd_linha_atual = len(dados_brutos) - 1
 cont_linhas_soma = 0
+
+
+dados_brutos['DATA_HORA'] = pd.to_datetime(dados_brutos['DATA_HORA'], format="%m/%d/%y %H:%M:%S %A")
+
 while qtd_linha_atual >= 0:
-    if(dados_brutos['DATA_HORA'][qtd_linha_atual] >= limite_tempo ):
+    
+    
+    if(dados_brutos['DATA_HORA'][qtd_linha_atual]>= limite_tempo ):
+
         
-        dados_brutos['DATA_HORA'] = pd.to_datetime(dados_brutos['DATA_HORA'])
-        dados_tratados = dados_brutos.drop_duplicates()
-        dados_tratados['EMPRESA'] = dados_brutos['EMPRESA']
-        dados_tratados['REGIAO'] = dados_brutos['REGIAO']
-        dados_tratados['DATACENTER'] = dados_brutos['DATACENTER']
-        dados_tratados['ZONA'] = dados_brutos['ZONA']
-        dados_tratados['SERVIDOR'] = dados_brutos['SERVIDOR']
 
-        # BYTE PARA GIGABYTE
-        dados_tratados['RAM_TOTAL'] = dados_brutos['RAM_TOTAL'] / (1024 ** 3)
-        dados_tratados['RAM_USADA'] = dados_brutos['RAM_TOTAL'] / (1024 ** 3)
-        dados_tratados['DISCO_TOTAL'] = dados_brutos['DISCO_TOTAL'] / (1024 ** 3)
-        dados_tratados['DISCO_USADO'] = dados_brutos['DISCO_USADO'] / (1024 ** 3)
+         # pegando os dados do servidor
+        
+        empresa = dados_brutos['EMPRESA'][qtd_linha_atual] 
+        regiao = dados_brutos['REGIAO'][qtd_linha_atual] 
+        datacenter = dados_brutos['DATACENTER'][qtd_linha_atual] 
+        zona = dados_brutos['ZONA'][qtd_linha_atual] 
+        servidor = dados_brutos['SERVIDOR'][qtd_linha_atual] 
 
 
-        dados_tratados['RAM_PERCENT'] = dados_brutos['RAM_PERCENT']
-        dados_tratados['CPU'] = dados_brutos['CPU']
-        dados_tratados['DISCO_PERCENT'] = dados_brutos['DISCO_PERCENT'] 
-        dados_tratados['LATENCIA'] = dados_brutos['LATENCIA'] 
-        dados_tratados['PACOTES_ENVIADOS'] = dados_brutos['PACOTES_ENVIADOS'] 
-        dados_tratados['PACOTES_RECEBIDOS'] = dados_brutos['PACOTES_RECEBIDOS'] 
-        dados_tratados['QTD_PR'] = dados_brutos['QTD_PR'] 
-        dados_tratados['PROCESSO1_CPU'] = dados_brutos['PROCESSO1_CPU'] 
-        dados_tratados['PORCENTAGEM_PROCESSO1_CPU'] = dados_brutos['PORCENTAGEM_PROCESSO1_CPU'] 
-        dados_tratados['PROCESSO2_CPU'] = dados_brutos['PROCESSO2_CPU'] 
-        dados_tratados['PORCENTAGEM_PROCESSO2_CPU'] = dados_brutos['PORCENTAGEM_PROCESSO2_CPU'] 
-        dados_tratados['PROCESSO3_CPU'] = dados_brutos['PROCESSO3_CPU'] 
-        dados_tratados['PORCENTAGEM_PROCESSO3_CPU'] = dados_brutos['PORCENTAGEM_PROCESSO3_CPU']
-        dados_tratados['PROCESSO1_RAM'] = dados_brutos['PROCESSO1_RAM']
-        dados_tratados['PORCENTAGEM_PROCESSO1_RAM'] = dados_brutos['PORCENTAGEM_PROCESSO1_RAM']
-        dados_tratados['PROCESSO2_RAM'] = dados_brutos['PROCESSO2_RAM']
-        dados_tratados['PORCENTAGEM_PROCESSO2_RAM'] = dados_brutos['PORCENTAGEM_PROCESSO2_RAM']
-        dados_tratados['PROCESSO3_RAM'] = dados_brutos['PROCESSO3_RAM']
-        dados_tratados['PORCENTAGEM_PROCESSO3_RAM'] = dados_brutos['PORCENTAGEM_PROCESSO3_RAM']
 
-hora_agora = timedelta.now()
-with open('dados-tratados.csv', 'w', newline='', encoding='utf-8') as arquivo:
-    escritor = csv.writer(arquivo)
-    escritor.writerows(dados_tratados)
+        porcentagem_cpu  = dados_brutos['CPU'][qtd_linha_atual] 
+        quantidade_nucleos = dados_brutos['QTD_NUCLEOS'][qtd_linha_atual] 
+        ram_total = dados_brutos['RAM_TOTAL'][qtd_linha_atual]  / (1024 ** 3)
+        ram_usado = dados_brutos['RAM_USADA'][qtd_linha_atual]  / (1024 ** 3)
+        ram_percent = dados_brutos['RAM_PERCENT'][qtd_linha_atual] 
+        disco_total = dados_brutos['DISCO_TOTAL'][qtd_linha_atual]  / (1024 ** 3)
+        disco_usado = dados_brutos['DISCO_USADO'][qtd_linha_atual]  / (1024 ** 3)
+        disco_percent = dados_brutos['DISCO_PERCENT'][qtd_linha_atual] 
 
-upload_file('dados-tratados.csv', 'smartdatabucket', f'treated/dados-tratados-{hora_agora}.csv')
+
+
+        latencia = round(dados_brutos['LATENCIA'][qtd_linha_atual] , 2)
+        pacotes_enviados = dados_brutos['PACOTES_ENVIADOS'][qtd_linha_atual] 
+        pacotes_recebidos = dados_brutos['PACOTES_RECEBIDOS'][qtd_linha_atual] 
+        pacotes_perdidos = dados_brutos['PACOTES_PERDIDOS'][qtd_linha_atual] 
+
+
+
+
+        quantidade_processos = dados_brutos['QTD_PR'][qtd_linha_atual] 
+        uso_usuario = dados_brutos['USO_USER'][qtd_linha_atual] 
+        uso_sistema = dados_brutos['USO_SISTEM'][qtd_linha_atual] 
+
+
+
+
+        processo_1_nome_cpu = dados_brutos['PROCESSO1_CPU'][qtd_linha_atual] 
+        processo_1_porcentagem_cpu = dados_brutos['PORCENTAGEM_PROCESSO1_CPU'][qtd_linha_atual] 
+
+        processo_2_nome_cpu = dados_brutos['PROCESSO2_CPU'][qtd_linha_atual] 
+        processo_2_porcentagem_cpu = dados_brutos['PORCENTAGEM_PROCESSO2_CPU'][qtd_linha_atual] 
+
+        processo_3_nome_cpu = dados_brutos['PROCESSO3_CPU'][qtd_linha_atual] 
+        processo_3_porcentagem_cpu = dados_brutos['PORCENTAGEM_PROCESSO3_CPU'][qtd_linha_atual] 
+
+
+
+
+
+        processo_1_nome_ram = dados_brutos['PROCESSO1_RAM'][qtd_linha_atual] 
+        processo_1_ram_total = dados_brutos['PORCENTAGEM_PROCESSO1_RAM'][qtd_linha_atual]  / (1024 ** 3)
+        processo_1_ram_percent =  (processo_1_porcentagem_cpu * 100) / ram_total
+
+        processo_2_nome_ram = dados_brutos['PROCESSO2_RAM'][qtd_linha_atual] 
+        processo_2_ram_total = dados_brutos['PORCENTAGEM_PROCESSO2_RAM'][qtd_linha_atual]  / (1024 ** 3)
+        processo_2_ram_percent =  (processo_2_porcentagem_cpu * 100) / ram_total
+
+        processo_3_nome_ram = dados_brutos['PROCESSO3_RAM'][qtd_linha_atual] 
+        processo_3_ram_total = dados_brutos['PORCENTAGEM_PROCESSO3_RAM'][qtd_linha_atual]  / (1024 ** 3)
+        processo_3_ram_percent =  (processo_3_porcentagem_cpu * 100) / ram_total
+
+
+        memoria_cache = dados_brutos['MEMORIA_CACHE'][qtd_linha_atual]   / (1024 ** 3)
+        memoria_livre = dados_brutos['MEMORIA_LIVRE'][qtd_linha_atual]  / (1024 ** 3)
+        memoria_disponivel = dados_brutos['MEMORIA_DISPONIVEL'][qtd_linha_atual]  / (1024 ** 3)
+
+
+
+
+
+
+        swap_total = dados_brutos['SWAP_TOTAL'][qtd_linha_atual]  / (1024 ** 3)
+        swap_em_uso = dados_brutos['SWAP_USADA'][qtd_linha_atual]  / (1024 ** 3)
+        swap_livre = dados_brutos['SWAP_LIVRE'][qtd_linha_atual]  / (1024 ** 3)
+        swap_percent = dados_brutos['SWAP_PERCENT'][qtd_linha_atual] 
+
+
+
+        
+        boottime = pd.to_datetime(float(dados_brutos['BOOTTIME'][qtd_linha_atual] ), unit='s')
+        hora = dados_brutos['DATA_HORA'][qtd_linha_atual]
+        uptime = hora - boottime
+        hora_tratamento = pd.Timestamp.now()
+        
+
+
+        with open('dados-tratados.csv', 'a', newline='', encoding='utf-8') as arquivo:
+            colunas =['EMPRESA', 'REGIAO', 'DATACENTER', 'ZONA', 'SERVIDOR', 'CPU_PER', 'QTD_NUCLEOS',
+         'RAM_TOTAL', 'RAM_USADO', 'RAM_PER', 'DISCO_TOTAL', 'DISCO_USADO', 'DISCO_PER',
+         'LATENCIA', 'PACOTES_ENV', 'PACOTES_RCB', 'PACOTES_PER', 'QTR_PR', 'USO_USER', 'USO_SISTEM',
+         'PROCESSO01_CPU_N', 'PROCESSO1_CPU_P', 'PROCESSO2_CPU_N', 'PROCESSO2_CPU_P', 'PROCESSO3_CPU_N', 'PROCESSO3_CPU_P',
+        'PROCESSO01_RAM_N','PROCESSO1_RAM_T' ,'PROCESSO1_RAM_P','PROCESSO2_RAM_T'  ,'PROCESSO2_RAM_N', 'PROCESSO2_RAM_P', 'PROCESSO3_RAM_N', 'PROCESSO3_RAM_T' ,'PROCESSO3_RAM_P',
+        'MEMORIA_CACHE_T', 'MEMORIA_CACHE_L', 'MEMORIA_CACHE_D', 'SWAP_TOTAL', 'SWAP_USO', 'SWAP_LIVRE', 'SWAP_PERCENT', 'BOOTTIME', 'DATE', 'UPTIME','HORA_TRATAMENTO'
+             ]
+            escritor = csv.DictWriter(arquivo, fieldnames=colunas, delimiter=';')
+    
+    
+            if arquivo.tell() == 0:
+                    escritor.writeheader()
+    
+            escrever_dados = {
+                'EMPRESA': empresa,
+                'REGIAO': regiao,
+                'DATACENTER': datacenter,
+                'ZONA': zona,
+                'SERVIDOR': servidor,
+                'CPU_PER': porcentagem_cpu,
+                'QTD_NUCLEOS': quantidade_nucleos,
+                'RAM_TOTAL': ram_total, 
+                'RAM_USADO': ram_usado,
+                'RAM_PER': ram_percent,
+                'DISCO_TOTAL': disco_total,
+                'DISCO_USADO': disco_usado,
+                'DISCO_PER': disco_percent, 
+                'LATENCIA': latencia, 
+                'PACOTES_ENV': pacotes_enviados,
+                'PACOTES_RCB': pacotes_recebidos,
+                'PACOTES_PER': pacotes_perdidos,
+                'QTR_PR': quantidade_processos,
+                'USO_USER': uso_usuario,
+                'USO_SISTEM': uso_sistema,
+                'PROCESSO01_CPU_N': processo_1_nome_cpu,
+                'PROCESSO1_CPU_P': processo_1_porcentagem_cpu,
+                'PROCESSO2_CPU_N':  processo_2_nome_cpu,
+                'PROCESSO2_CPU_P': processo_2_porcentagem_cpu,
+                'PROCESSO3_CPU_N': processo_3_nome_cpu,
+                'PROCESSO3_CPU_P': processo_3_porcentagem_cpu,
+                'PROCESSO01_RAM_N': processo_1_nome_ram,
+                'PROCESSO1_RAM_T': processo_1_ram_total,
+                'PROCESSO1_RAM_P': processo_1_ram_percent,
+                'PROCESSO2_RAM_N': processo_2_nome_ram,
+                'PROCESSO2_RAM_T': processo_2_ram_total,
+                'PROCESSO2_RAM_P': processo_2_ram_percent,
+                'PROCESSO3_RAM_N': processo_3_nome_ram,
+                'PROCESSO3_RAM_T': processo_3_ram_total,
+                'PROCESSO3_RAM_P': processo_3_ram_percent, 
+                'MEMORIA_CACHE_T': memoria_cache,
+                'MEMORIA_CACHE_L': memoria_livre,
+                'MEMORIA_CACHE_D': memoria_disponivel,
+                'SWAP_TOTAL': swap_total,
+                'SWAP_LIVRE': swap_livre,
+                'SWAP_USO': swap_em_uso,
+                'SWAP_PERCENT': swap_percent,
+                'BOOTTIME': boottime,
+                'DATE': hora,
+                'UPTIME': uptime,
+                'HORA_TRATAMENTO': hora_tratamento
+            }
+            escritor.writerow(escrever_dados)
+            arquivo.flush()
+    
+    qtd_linha_atual -= 1
+
+
+        
+if qtd_linha_atual <= 0: 
+    upload_file('dados-tratados.csv', 's3-smart-data-teste', f'treated/dados_tratados-{hora}')
+    print("dados enviados com sucesso!")
+
+else:
+    print("nenhum dado encontrado")
+
+
+
+
+
+
+
+
+
 
 
 ############################################## PARA CADA EMPRESA SERÀ GERADO TrÊS CSVS: GESTOR, ANALISTA, ESPECIFICA 
@@ -133,9 +276,14 @@ upload_file('dados-tratados.csv', 'smartdatabucket', f'treated/dados-tratados-{h
 
 
 
+#!!!!Gabriel  troquei o jeito dos comentarios
+
+
 # EXEMPLO: dados-client-empresaX-gestor-12-10-26-22:33:00
 # EXEMPLO: dados-client-empresaX-analista-12-10-26-22:33:00
 
+
+"""
 
 for empresa in empresas:
     dados_client_gestor = {}
@@ -156,6 +304,6 @@ for empresa in empresas:
 
     
 
-
+"""
 
 
