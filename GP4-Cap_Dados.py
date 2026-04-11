@@ -111,7 +111,8 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
 
 
         memoria = psutil.virtual_memory()
-        cache = memoria.cached + memoria.buffers
+        # cache = memoria.cached + memoria.buffers
+        cache = 00.00
         livre = memoria.free
         disponivel = memoria.available
 

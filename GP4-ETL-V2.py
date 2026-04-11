@@ -1,5 +1,5 @@
 import pandas as pd
-from datetime import timedelta
+from datetime import datetime, timedelta
 import time 
 import csv
 import boto3
@@ -26,7 +26,7 @@ print("""\033[33m
 
 
 
-# acesso ao banco de dados
+##### Acesso ao banco de dados
 
 conexao = mysql.connector.connect(
     host="127.0.0.1",  
@@ -43,12 +43,17 @@ empresas = cursor.fetchall()
 for linha in empresas:
     print(linha)
 
-conexao.close()
 
 
 
 
-# acesso ao bucket
+
+
+
+
+
+
+##### Acesso ao bucket
 
 s3_cliente = boto3.client(
     's3',
@@ -77,11 +82,8 @@ dados_brutos = pd.read_csv(caminho_csv, sep=';')
 
 
 
+######################### Tratando os dados para o treated #########################
 
-    
-
-
-# tratando os dados para o treated
 limite_tempo = pd.Timestamp.now() - timedelta(minutes=5)
 qtd_linha_atual = len(dados_brutos) - 1
 cont_linhas_soma = 0
@@ -94,16 +96,13 @@ while qtd_linha_atual >= 0:
     
     if(dados_brutos['DATA_HORA'][qtd_linha_atual]>= limite_tempo ):
 
-        
-
-         # pegando os dados do servidor
+         # Pegando os dados do servidor
         
         empresa = dados_brutos['EMPRESA'][qtd_linha_atual] 
         regiao = dados_brutos['REGIAO'][qtd_linha_atual] 
         datacenter = dados_brutos['DATACENTER'][qtd_linha_atual] 
         zona = dados_brutos['ZONA'][qtd_linha_atual] 
         servidor = dados_brutos['SERVIDOR'][qtd_linha_atual] 
-
 
 
         porcentagem_cpu  = dados_brutos['CPU'][qtd_linha_atual] 
@@ -114,7 +113,6 @@ while qtd_linha_atual >= 0:
         disco_total = dados_brutos['DISCO_TOTAL'][qtd_linha_atual]  / (1024 ** 3)
         disco_usado = dados_brutos['DISCO_USADO'][qtd_linha_atual]  / (1024 ** 3)
         disco_percent = dados_brutos['DISCO_PERCENT'][qtd_linha_atual] 
-
 
 
         latencia = round(dados_brutos['LATENCIA'][qtd_linha_atual] , 2)
@@ -143,8 +141,6 @@ while qtd_linha_atual >= 0:
 
 
 
-
-
         processo_1_nome_ram = dados_brutos['PROCESSO1_RAM'][qtd_linha_atual] 
         processo_1_ram_total = dados_brutos['PORCENTAGEM_PROCESSO1_RAM'][qtd_linha_atual]  / (1024 ** 3)
         processo_1_ram_percent =  (processo_1_porcentagem_cpu * 100) / ram_total
@@ -161,8 +157,6 @@ while qtd_linha_atual >= 0:
         memoria_cache = dados_brutos['MEMORIA_CACHE'][qtd_linha_atual]   / (1024 ** 3)
         memoria_livre = dados_brutos['MEMORIA_LIVRE'][qtd_linha_atual]  / (1024 ** 3)
         memoria_disponivel = dados_brutos['MEMORIA_DISPONIVEL'][qtd_linha_atual]  / (1024 ** 3)
-
-
 
 
 
@@ -184,11 +178,11 @@ while qtd_linha_atual >= 0:
 
         with open('dados-tratados.csv', 'a', newline='', encoding='utf-8') as arquivo:
             colunas =['EMPRESA', 'REGIAO', 'DATACENTER', 'ZONA', 'SERVIDOR', 'CPU_PER', 'QTD_NUCLEOS',
-         'RAM_TOTAL', 'RAM_USADO', 'RAM_PER', 'DISCO_TOTAL', 'DISCO_USADO', 'DISCO_PER',
-         'LATENCIA', 'PACOTES_ENV', 'PACOTES_RCB', 'PACOTES_PER', 'QTR_PR', 'USO_USER', 'USO_SISTEM',
-         'PROCESSO01_CPU_N', 'PROCESSO1_CPU_P', 'PROCESSO2_CPU_N', 'PROCESSO2_CPU_P', 'PROCESSO3_CPU_N', 'PROCESSO3_CPU_P',
-        'PROCESSO01_RAM_N','PROCESSO1_RAM_T' ,'PROCESSO1_RAM_P','PROCESSO2_RAM_T'  ,'PROCESSO2_RAM_N', 'PROCESSO2_RAM_P', 'PROCESSO3_RAM_N', 'PROCESSO3_RAM_T' ,'PROCESSO3_RAM_P',
-        'MEMORIA_CACHE_T', 'MEMORIA_CACHE_L', 'MEMORIA_CACHE_D', 'SWAP_TOTAL', 'SWAP_USO', 'SWAP_LIVRE', 'SWAP_PERCENT', 'BOOTTIME', 'DATE', 'UPTIME','HORA_TRATAMENTO'
+                      'RAM_TOTAL', 'RAM_USADO', 'RAM_PER', 'DISCO_TOTAL', 'DISCO_USADO', 'DISCO_PER',
+                      'LATENCIA', 'PACOTES_ENV', 'PACOTES_RCB', 'PACOTES_PER', 'QTR_PR', 'USO_USER', 'USO_SISTEM',
+                      'PROCESSO01_CPU_N', 'PROCESSO1_CPU_P', 'PROCESSO2_CPU_N', 'PROCESSO2_CPU_P', 'PROCESSO3_CPU_N', 'PROCESSO3_CPU_P',
+                      'PROCESSO01_RAM_N','PROCESSO1_RAM_T' ,'PROCESSO1_RAM_P','PROCESSO2_RAM_T'  ,'PROCESSO2_RAM_N', 'PROCESSO2_RAM_P', 'PROCESSO3_RAM_N', 'PROCESSO3_RAM_T' ,'PROCESSO3_RAM_P',
+                      'MEMORIA_CACHE_T', 'MEMORIA_CACHE_L', 'MEMORIA_CACHE_D', 'SWAP_TOTAL', 'SWAP_USO', 'SWAP_LIVRE', 'SWAP_PERCENT', 'BOOTTIME', 'DATE', 'UPTIME','HORA_TRATAMENTO'
              ]
             escritor = csv.DictWriter(arquivo, fieldnames=colunas, delimiter=';')
     
@@ -196,7 +190,7 @@ while qtd_linha_atual >= 0:
             if arquivo.tell() == 0:
                     escritor.writeheader()
     
-            escrever_dados = {
+            dados_tratados = {
                 'EMPRESA': empresa,
                 'REGIAO': regiao,
                 'DATACENTER': datacenter,
@@ -244,7 +238,7 @@ while qtd_linha_atual >= 0:
                 'UPTIME': uptime,
                 'HORA_TRATAMENTO': hora_tratamento
             }
-            escritor.writerow(escrever_dados)
+            escritor.writerow(dados_tratados)
             arquivo.flush()
     
     qtd_linha_atual -= 1
@@ -261,49 +255,118 @@ else:
 
 
 
+######################### Tratando os dados para o client #########################
 
 
 
-
-
-
-
-############################################## PARA CADA EMPRESA SERÀ GERADO TrÊS CSVS: GESTOR, ANALISTA, ESPECIFICA 
-
-#OLHA O TXT!
+#PARA CADA EMPRESA SERÀ GERADO TRÊS CSVS: GESTOR, ANALISTA, ESPECIFICA 
+#OLHAR O TXT!
 #VALLE: GESTOR E DOIS ULTIMOS GRAFICOS DA ESPECIFICA
 #GABRIEL: ANALISTA E KPIS E PRIMEIRO GRAFICO DA ESPECIFICA
 
-
-
 #!!!!Gabriel  troquei o jeito dos comentarios
-
+#EU VIIII, mas mudei um tico tbm
 
 # EXEMPLO: dados-client-empresaX-gestor-12-10-26-22:33:00
 # EXEMPLO: dados-client-empresaX-analista-12-10-26-22:33:00
 
 
-"""
+dados_client_gestor = {}
+dados_client_analista = {}
+dados_client_ESPECIFICA = {}
 
-for empresa in empresas:
-    dados_client_gestor = {}
-    dados_client_analista = {}
-    dados_client_ESPECIFICA = {}
+
+
+
+########### JSON ANALISA
+
+#Querys
+
+query = "SELECT * FROM zonas"
+cursor.execute(query)
+zonas = cursor.fetchall()
+
+
+
+#KPIs
+total_servidores = 0
+servidores_inativos = 0
+p99Ram_Perc = 0
+p99CPU_Perc = 0
+UsoDisco_Perc = 0
+UsoDisco_TB = 0
+TotalDisco_TB = 0
+Qtd_serv_baixaLatencia = 0
+
+
+
+for zona in zonas:
+    nomeZona = zona[2]
+    idZona = zona[0]
+
+    #KPI1 total_servidores
+    query = f"SELECT count(idServidores) FROM servidor where fkZona = {idZona}"
+    cursor.execute(query)
+    queryAtual = cursor.fetchall()
+    total_servidores = queryAtual[0]
     
-    for linhaT in dados_tratados:
-        if(linhaT['EMPRESA'] == empresa[1]):
+    #KPI2 servidores_inativos
+    query = f"SELECT count(idServidores) FROM servidor where fkZona = {idZona} AND estado = 'Inativo'"
+    cursor.execute(query)
+    queryAtual = cursor.fetchall()
+    servidores_inativos = queryAtual[0]
+
+    #KPI3 p99Ram_Perc
+    agora = datetime.now()
+    limite_tempo = agora - timedelta(minutes=5)
+    df_ultimos5M = dados_tratados[dados_tratados['DATA_HORA'] >= limite_tempo]
+    if not df_ultimos5M.empty:
+        p99Ram_Perc = df_ultimos5M['RAM_PERCENT'].quantile(0.99)
+    else:
+        p99Ram_Perc = 0.0
+
+    #KPI4 p99CPU_Perc
+
+dados_client_analista = {
+    'KPIS': {
+        'Total de servidores (QTD)': total_servidores,
+        'Servidores Inativos (QTD)': servidores_inativos,
+        'P99 da RAM (%)': p99Ram_Perc,
+        'P99 da CPU (%)': p99CPU_Perc,
+        'Uso Disco (%)': UsoDisco_Perc,
+        'Uso Disco (TB)': UsoDisco_TB,
+        'Total Disco (TB)': TotalDisco_TB,
+        'Servidores baixa latencia (QTD)': Qtd_serv_baixaLatencia
+    }
+}
+
+
+#ENVIAR O JSON ANALISA PARA O CLIENT
+
+#upload_file(f'dados-clint-{linhaT['EMPRESA']}-analista.json', 's3-smart-data-teste', f'treated/dados-client-{linhaT['EMPRESA']}-analista-{timedelta.now()}')
+    
+    
+    
+    
+    
+
+            
             #MONTAR O JSON GESTOR
-            #MONTAR O JSON ANALISA
             #MONTAR O JSON ESPECIFICA
 
 
 
             #ENVIAR O JSON GESTOR PARA O CLIENT
-            #ENVIAR O JSON ANALISA PARA O CLIENT
             #ENVIAR O JSON ESPECIFICA PARA O CLIENT
+
 
     
 
-"""
 
 
+
+
+
+
+#Fechar a conexão com o mysql
+conexao.close()
