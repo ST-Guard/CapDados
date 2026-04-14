@@ -32,7 +32,7 @@ conexao = mysql.connector.connect(
     host="127.0.0.1",  
     database="smartData",
     user="root",
-    password="102309",
+    password="",
     port="3306"  
 )
 cursor = conexao.cursor()
@@ -50,7 +50,7 @@ for linha in empresas:
 s3_cliente = boto3.client(
     's3',
     aws_access_key_id='',
-    aws_secret_access_key='+PKqAasNoL',
+    aws_secret_access_key='',
     aws_session_token=''
 )
 
@@ -80,173 +80,62 @@ dados_brutos = pd.read_csv(caminho_csv, sep=';')
 
 ######################### Tratando os dados para o treated #########################
 
-limite_tempo = pd.Timestamp.now() - timedelta(minutes=5)
-qtd_linha_atual = len(dados_brutos) - 1
-cont_linhas_soma = 0
-
-
 dados_brutos['DATA_HORA'] = pd.to_datetime(dados_brutos['DATA_HORA'], format="%m/%d/%y %H:%M:%S %A")
-
-while qtd_linha_atual >= 0:
-    
-    
-    if(dados_brutos['DATA_HORA'][qtd_linha_atual]>= limite_tempo ):
-
-         # Pegando os dados do servidor
-        
-        empresa = dados_brutos['EMPRESA'][qtd_linha_atual] 
-        regiao = dados_brutos['REGIAO'][qtd_linha_atual] 
-        datacenter = dados_brutos['DATACENTER'][qtd_linha_atual] 
-        zona = dados_brutos['ZONA'][qtd_linha_atual] 
-        servidor = dados_brutos['SERVIDOR'][qtd_linha_atual] 
+limite_tempo = pd.Timestamp.now() - timedelta(minutes=5)
+df_filtrado = dados_brutos[dados_brutos['DATA_HORA'] >= limite_tempo].copy()
 
 
-        porcentagem_cpu  = dados_brutos['CPU'][qtd_linha_atual] 
-        quantidade_nucleos = dados_brutos['QTD_NUCLEOS'][qtd_linha_atual] 
-        ram_total = dados_brutos['RAM_TOTAL'][qtd_linha_atual]  / (1024 ** 3)
-        ram_usado = dados_brutos['RAM_USADA'][qtd_linha_atual]  / (1024 ** 3)
-        ram_percent = dados_brutos['RAM_PERCENT'][qtd_linha_atual] 
-        disco_total = dados_brutos['DISCO_TOTAL'][qtd_linha_atual]  / (1024 ** 3)
-        disco_usado = dados_brutos['DISCO_USADO'][qtd_linha_atual]  / (1024 ** 3)
-        disco_percent = dados_brutos['DISCO_PERCENT'][qtd_linha_atual] 
-
-
-        latencia = round(dados_brutos['LATENCIA'][qtd_linha_atual] , 2)
-        pacotes_enviados = dados_brutos['PACOTES_ENVIADOS'][qtd_linha_atual] 
-        pacotes_recebidos = dados_brutos['PACOTES_RECEBIDOS'][qtd_linha_atual] 
-        pacotes_perdidos = dados_brutos['PACOTES_PERDIDOS'][qtd_linha_atual] 
-
-
-
-
-        quantidade_processos = dados_brutos['QTD_PR'][qtd_linha_atual] 
-        uso_usuario = dados_brutos['USO_USER'][qtd_linha_atual] 
-        uso_sistema = dados_brutos['USO_SISTEM'][qtd_linha_atual] 
-
-
-
-
-        processo_1_nome_cpu = dados_brutos['PROCESSO1_CPU'][qtd_linha_atual] 
-        processo_1_porcentagem_cpu = dados_brutos['PORCENTAGEM_PROCESSO1_CPU'][qtd_linha_atual] 
-
-        processo_2_nome_cpu = dados_brutos['PROCESSO2_CPU'][qtd_linha_atual] 
-        processo_2_porcentagem_cpu = dados_brutos['PORCENTAGEM_PROCESSO2_CPU'][qtd_linha_atual] 
-
-        processo_3_nome_cpu = dados_brutos['PROCESSO3_CPU'][qtd_linha_atual] 
-        processo_3_porcentagem_cpu = dados_brutos['PORCENTAGEM_PROCESSO3_CPU'][qtd_linha_atual] 
-
-
-
-        processo_1_nome_ram = dados_brutos['PROCESSO1_RAM'][qtd_linha_atual] 
-        processo_1_ram_total = dados_brutos['PORCENTAGEM_PROCESSO1_RAM'][qtd_linha_atual]  / (1024 ** 3)
-        processo_1_ram_percent =  (processo_1_ram_total * 100) / ram_total
-
-        processo_2_nome_ram = dados_brutos['PROCESSO2_RAM'][qtd_linha_atual] 
-        processo_2_ram_total = dados_brutos['PORCENTAGEM_PROCESSO2_RAM'][qtd_linha_atual]  / (1024 ** 3)
-        processo_2_ram_percent =  (processo_2_porcentagem_cpu * 100) / ram_total
-
-        processo_3_nome_ram = dados_brutos['PROCESSO3_RAM'][qtd_linha_atual] 
-        processo_3_ram_total = dados_brutos['PORCENTAGEM_PROCESSO3_RAM'][qtd_linha_atual]  / (1024 ** 3)
-        processo_3_ram_percent =  (processo_3_porcentagem_cpu * 100) / ram_total
-
-
-        memoria_cache = dados_brutos['MEMORIA_CACHE'][qtd_linha_atual]   / (1024 ** 3)
-        memoria_livre = dados_brutos['MEMORIA_LIVRE'][qtd_linha_atual]  / (1024 ** 3)
-        memoria_disponivel = dados_brutos['MEMORIA_DISPONIVEL'][qtd_linha_atual]  / (1024 ** 3)
-
-
-
-
-        swap_total = dados_brutos['SWAP_TOTAL'][qtd_linha_atual]  / (1024 ** 3)
-        swap_em_uso = dados_brutos['SWAP_USADA'][qtd_linha_atual]  / (1024 ** 3)
-        swap_livre = dados_brutos['SWAP_LIVRE'][qtd_linha_atual]  / (1024 ** 3)
-        swap_percent = dados_brutos['SWAP_PERCENT'][qtd_linha_atual] 
-
-
-
-        
-        boottime = pd.to_datetime(float(dados_brutos['BOOTTIME'][qtd_linha_atual] ), unit='s')
-        hora = dados_brutos['DATA_HORA'][qtd_linha_atual]
-        uptime = hora - boottime
-        hora_tratamento = pd.Timestamp.now()
-        
-
-
-        with open('dados-tratados.csv', 'a', newline='', encoding='utf-8') as arquivo:
-            colunas =['EMPRESA', 'REGIAO', 'DATACENTER', 'ZONA', 'SERVIDOR', 'CPU_PER', 'QTD_NUCLEOS',
-                      'RAM_TOTAL', 'RAM_USADO', 'RAM_PER', 'DISCO_TOTAL', 'DISCO_USADO', 'DISCO_PER',
-                      'LATENCIA', 'PACOTES_ENV', 'PACOTES_RCB', 'PACOTES_PER', 'QTR_PR', 'USO_USER', 'USO_SISTEM',
-                      'PROCESSO01_CPU_N', 'PROCESSO1_CPU_P', 'PROCESSO2_CPU_N', 'PROCESSO2_CPU_P', 'PROCESSO3_CPU_N', 'PROCESSO3_CPU_P',
-                      'PROCESSO01_RAM_N','PROCESSO1_RAM_T' ,'PROCESSO1_RAM_P','PROCESSO2_RAM_T'  ,'PROCESSO2_RAM_N', 'PROCESSO2_RAM_P', 'PROCESSO3_RAM_N', 'PROCESSO3_RAM_T' ,'PROCESSO3_RAM_P',
-                      'MEMORIA_CACHE_T', 'MEMORIA_CACHE_L', 'MEMORIA_CACHE_D', 'SWAP_TOTAL', 'SWAP_USO', 'SWAP_LIVRE', 'SWAP_PERCENT', 'BOOTTIME', 'DATE', 'UPTIME','HORA_TRATAMENTO'
-             ]
-            escritor = csv.DictWriter(arquivo, fieldnames=colunas, delimiter=';')
-    
-    
-            if arquivo.tell() == 0:
-                    escritor.writeheader()
-    
-            dados_tratados = {
-                'EMPRESA': empresa,
-                'REGIAO': regiao,
-                'DATACENTER': datacenter,
-                'ZONA': zona,
-                'SERVIDOR': servidor,
-                'CPU_PER': porcentagem_cpu,
-                'QTD_NUCLEOS': quantidade_nucleos,
-                'RAM_TOTAL': ram_total, 
-                'RAM_USADO': ram_usado,
-                'RAM_PER': ram_percent,
-                'DISCO_TOTAL': disco_total,
-                'DISCO_USADO': disco_usado,
-                'DISCO_PER': disco_percent, 
-                'LATENCIA': latencia, 
-                'PACOTES_ENV': pacotes_enviados,
-                'PACOTES_RCB': pacotes_recebidos,
-                'PACOTES_PER': pacotes_perdidos,
-                'QTR_PR': quantidade_processos,
-                'USO_USER': uso_usuario,
-                'USO_SISTEM': uso_sistema,
-                'PROCESSO01_CPU_N': processo_1_nome_cpu,
-                'PROCESSO1_CPU_P': processo_1_porcentagem_cpu,
-                'PROCESSO2_CPU_N':  processo_2_nome_cpu,
-                'PROCESSO2_CPU_P': processo_2_porcentagem_cpu,
-                'PROCESSO3_CPU_N': processo_3_nome_cpu,
-                'PROCESSO3_CPU_P': processo_3_porcentagem_cpu,
-                'PROCESSO01_RAM_N': processo_1_nome_ram,
-                'PROCESSO1_RAM_T': processo_1_ram_total,
-                'PROCESSO1_RAM_P': processo_1_ram_percent,
-                'PROCESSO2_RAM_N': processo_2_nome_ram,
-                'PROCESSO2_RAM_T': processo_2_ram_total,
-                'PROCESSO2_RAM_P': processo_2_ram_percent,
-                'PROCESSO3_RAM_N': processo_3_nome_ram,
-                'PROCESSO3_RAM_T': processo_3_ram_total,
-                'PROCESSO3_RAM_P': processo_3_ram_percent, 
-                'MEMORIA_CACHE_T': memoria_cache,
-                'MEMORIA_CACHE_L': memoria_livre,
-                'MEMORIA_CACHE_D': memoria_disponivel,
-                'SWAP_TOTAL': swap_total,
-                'SWAP_LIVRE': swap_livre,
-                'SWAP_USO': swap_em_uso,
-                'SWAP_PERCENT': swap_percent,
-                'BOOTTIME': boottime,
-                'DATE': hora,
-                'UPTIME': uptime,
-                'HORA_TRATAMENTO': hora_tratamento
-            }
-            escritor.writerow(dados_tratados)
-            arquivo.flush()
-    
-    qtd_linha_atual -= 1
-
-
-        
-if qtd_linha_atual <= 0: 
-    upload_file('dados-tratados.csv', bucket_name, f'treated/dados_tratados-{hora}')
-    print("dados enviados com sucesso!")
-
+if df_filtrado.empty:
+    print("Nenhum dado encontrado nos ultimos 5 minutos")
 else:
-    print("nenhum dado encontrado")
+    print(f"Encontradas {len(df_filtrado)} linhas para processar.")
+
+    df_filtrado['RAM_TOTAL_GB'] = df_filtrado['RAM_TOTAL'] / (1024 ** 3)
+    df_filtrado['RAM_USADA_GB'] = df_filtrado['RAM_USADA'] / (1024 ** 3)
+    df_filtrado['DISCO_TOTAL_GB'] = df_filtrado['DISCO_TOTAL'] / (1024 ** 3)
+    df_filtrado['DISCO_USADO_GB'] = df_filtrado['DISCO_USADO'] / (1024 ** 3)
+    
+    df_filtrado['LATENCIA'] = df_filtrado['LATENCIA'].round(2)
+    
+    df_filtrado['PROCESSO1_RAM_GB'] = df_filtrado['PORCENTAGEM_PROCESSO1_RAM'] / (1024 ** 3)
+    df_filtrado['PROCESSO2_RAM_GB'] = df_filtrado['PORCENTAGEM_PROCESSO2_RAM'] / (1024 ** 3)
+    df_filtrado['PROCESSO3_RAM_GB'] = df_filtrado['PORCENTAGEM_PROCESSO3_RAM'] / (1024 ** 3)
+
+    df_filtrado['PROCESSO1_RAM_PERC'] = (df_filtrado['PROCESSO1_RAM_GB'] * 100) / df_filtrado['RAM_TOTAL_GB']
+    df_filtrado['PROCESSO2_RAM_PERC'] = (df_filtrado['PROCESSO2_RAM_GB'] * 100) / df_filtrado['RAM_TOTAL_GB']
+    df_filtrado['PROCESSO3_RAM_PERC'] = (df_filtrado['PROCESSO3_RAM_GB'] * 100) / df_filtrado['RAM_TOTAL_GB']
+
+    #TEMPOOOOO
+    df_filtrado['BOOTTIME_DT'] = pd.to_datetime(df_filtrado['BOOTTIME'], unit='s')
+    df_filtrado['UPTIME'] = df_filtrado['DATA_HORA'] - df_filtrado['BOOTTIME_DT']
+    df_filtrado['HORA_TRATAMENTO'] = pd.Timestamp.now()
+
+    
+    colunas_finais = {
+        'EMPRESA': 'EMPRESA', 'REGIAO': 'REGIAO', 'DATACENTER': 'DATACENTER', 'ZONA': 'ZONA', 'SERVIDOR': 'SERVIDOR',
+        'CPU': 'CPU_PER', 'QTD_NUCLEOS': 'QTD_NUCLEOS', 'RAM_TOTAL_GB': 'RAM_TOTAL', 'RAM_USADA_GB': 'RAM_USADO', 
+        'RAM_PERCENT': 'RAM_PER', 'DISCO_TOTAL_GB': 'DISCO_TOTAL', 'DISCO_USADO_GB': 'DISCO_USADO', 'DISCO_PERCENT': 'DISCO_PER',
+        'LATENCIA': 'LATENCIA', 'PACOTES_ENVIADOS': 'PACOTES_ENV', 'PACOTES_RECEBIDOS': 'PACOTES_RCB', 'PACOTES_PERDIDOS': 'PACOTES_PER',
+        'QTD_PR': 'QTR_PR', 'USO_USER': 'USO_USER', 'USO_SISTEM': 'USO_SISTEM',
+        'PROCESSO1_CPU': 'PROCESSO01_CPU_N', 'PORCENTAGEM_PROCESSO1_CPU': 'PROCESSO1_CPU_P',
+        'PROCESSO2_CPU': 'PROCESSO2_CPU_N', 'PORCENTAGEM_PROCESSO2_CPU': 'PROCESSO2_CPU_P',
+        'PROCESSO3_CPU': 'PROCESSO3_CPU_N', 'PORCENTAGEM_PROCESSO3_CPU': 'PROCESSO3_CPU_P',
+        'PROCESSO1_RAM': 'PROCESSO01_RAM_N', 'PROCESSO1_RAM_GB': 'PROCESSO1_RAM_T', 'PROCESSO1_RAM_PERC': 'PROCESSO1_RAM_P',
+        'PROCESSO2_RAM': 'PROCESSO2_RAM_N', 'PROCESSO2_RAM_GB': 'PROCESSO2_RAM_T', 'PROCESSO2_RAM_PERC': 'PROCESSO2_RAM_P',
+        'PROCESSO3_RAM': 'PROCESSO3_RAM_N', 'PROCESSO3_RAM_GB': 'PROCESSO3_RAM_T', 'PROCESSO3_RAM_PERC': 'PROCESSO3_RAM_P',
+        'BOOTTIME_DT': 'BOOTTIME', 'DATA_HORA': 'DATE', 'UPTIME': 'UPTIME', 'HORA_TRATAMENTO': 'HORA_TRATAMENTO'
+    }
+
+
+    df_silver = df_filtrado.rename(columns=colunas_finais)[list(colunas_finais.values())]
+
+  
+    df_silver.to_csv('dados-tratados.csv', sep=';', index=False, mode='a', header=not pd.io.common.file_exists('dados-tratados.csv'))
+
+    
+    hora_envio = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S') 
+    upload_file('dados-tratados.csv', bucket_name, f'treated/dados_tratados-{hora_envio}.csv')
+    print("Dados tratados e enviados com sucesso!")
 
 
 
@@ -310,7 +199,7 @@ dados_client_ESPECIFICA = {}
 
 #Querys
 
-query = "SELECT * FROM zonas"
+query = "SELECT * FROM zona"
 cursor.execute(query)
 zonas = cursor.fetchall()
 
@@ -345,7 +234,7 @@ for zona in zonas:
     idZona = zona[0]
     agora = datetime.now()
     limite_tempo = agora - timedelta(minutes=5)
-    df_ultimos5M = dados_tratados[dados_tratados['DATA_HORA'] >= limite_tempo]
+    df_ultimos5M = df_filtrado[df_filtrado['DATA_HORA'] >= limite_tempo]
     if df_ultimos5M.empty:
         break
     df_ultimos5MZonaX = df_ultimos5M[df_ultimos5M['ZONA'] == nomeZona]
