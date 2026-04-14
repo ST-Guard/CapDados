@@ -32,7 +32,7 @@ conexao = mysql.connector.connect(
     host="127.0.0.1",  
     database="smartData",
     user="root",
-    password="030979@Ma",
+    password="",
     port="3306"  
 )
 cursor = conexao.cursor()
@@ -143,7 +143,7 @@ while qtd_linha_atual >= 0:
 
         processo_1_nome_ram = dados_brutos['PROCESSO1_RAM'][qtd_linha_atual] 
         processo_1_ram_total = dados_brutos['PORCENTAGEM_PROCESSO1_RAM'][qtd_linha_atual]  / (1024 ** 3)
-        processo_1_ram_percent =  (processo_1_porcentagem_cpu * 100) / ram_total
+        processo_1_ram_percent =  (processo_1_ram_total * 100) / ram_total
 
         processo_2_nome_ram = dados_brutos['PROCESSO2_RAM'][qtd_linha_atual] 
         processo_2_ram_total = dados_brutos['PORCENTAGEM_PROCESSO2_RAM'][qtd_linha_atual]  / (1024 ** 3)
@@ -275,80 +275,6 @@ dados_client_gestor = {}
 dados_client_analista = {}
 dados_client_ESPECIFICA = {}
 
-"""
-KPI
-Processo com maior consumo (VARCHAR)
-Quantidade de alertas (INT)
-Indice de Confiança para Manutenção Preventiva (ICMP) (%)
-Servidores Ativos (INT)
-Servidores Inativos (INT)
-
-Tendencia de degradação (DIARIA)(ULTIMO 30 DIAS) {
-29/03: {QTD_SOBRECARREADO: 30, QTD_ESTRESSADOS: 20},
-28/03: {QTD_SOBRECARREADO: 30, QTD_ESTRESSADOS: 20},
-29/03: {QTD_SOBRECARREADO: 30, QTD_ESTRESSADOS: 20}
-....
-}
-
-Pico de Uso Semanal (DIARIA)(DIA SEMANA){
-CPU:   {PICO_MAXIMO: 91%, PICO_MEDIO: 77%, PICO_ MINIMO: 30%, SEG: 30%,TER: 20% . . .},
-RAM:   {PICO_MAXIMO: 91%, PICO_MEDIO: 77%, PICO_ MINIMO: 30%, SEG: 30%,TER: 20% . . .},
-DISCO: {PICO_MAXIMO: 91%, PICO_MEDIO: 77%, PICO_ MINIMO: 30%, SEG: 30%,TER: 20% . . .},
-}
-
-"""
-
-dados_client_gestor  = { 
-    'Kpis': {
-    'processo_com_maior_uso': 'aaa',
-    'porcentagem_maior_uso_ram': 'aaaa',
-    'porcentagem_maior_uso_cpu': 'aaaaa', 
-
-    'quantidade de alertas': 'aaa',
-    'indice de confiança para manutenção preventiva': 'aaa', 
-    'servidores ativos': 'aaa',
-    'servidores inativos': 'aaa'
-    },
-    'Tendencia_Degradacao': {
-        
-    } 
-}
-
-"""
-****GESTOR PT2
---KPI
-Processo com maior consumo (VARCHAR)
-Quantidade de alertas (INT)
-Indice de Confiança para Manutenção Preventiva (ICMP) (%)
-Servidores Ativos (INT)
-Servidores Inativos (INT)
-
-Uso de Disco vs Rede (HORA)(ULTIMO 24 HRS) {
-00:00: {UsoDisco: 30%, TrafegoRede: 20%},
-03:00: {UsoDisco: 50%, TrafegoRede: 30%},
-05:00: {UsoDisco: 70%, TrafegoRede: 20%},
-...
-}
-Pico de Disco (%)
-Horário do pico de Disco (VARCHAR)
-Pico de Rede (%)
-Horário do pico de Rede (VARCHAR)
-
-Tempo de atividade vc Latência (HORA)(ULTIMO 24 HRS) {
-00:00: {Uptime: 30%, Latencia: 20%},
-03:00: {Uptime: 50%, Latencia: 30%},
-05:00: {Uptime: 70%, Latencia: 20%},
-...
-}
-Servidor com menor UPTIME (VARCHAR)
-Horário do servidor com menor UPTIME (VARCHAR)
-Pico de Latência (MS)
-
-Servidores online (INT)
-Servidores críticos (INT)
-"""
-
-
 
 
 
@@ -372,11 +298,33 @@ UsoDisco_TB = 0
 TotalDisco_TB = 0
 Qtd_serv_baixaLatencia = 0
 
+#GRAFICOS
+servidoresCriticos = 0
+qtdTotalServidores = 0
+
+top3_ProcessosUsoRam = 0
+somaTop3_ProcUsoRamGB = 0
+porcentagemSomaTop_ProcUsoRam3GB = 0
+
+top3_ProcessosUsoCPU = 0
+porcentagemSomaTop_ProcUsoCPU3GB = 0
+
+UsoMedioRecursos = 0
 
 
 for zona in zonas:
     nomeZona = zona[2]
     idZona = zona[0]
+    agora = datetime.now()
+    limite_tempo = agora - timedelta(minutes=5)
+    df_ultimos5M = dados_tratados[dados_tratados['DATA_HORA'] >= limite_tempo]
+    if df_ultimos5M.empty:
+        break
+    df_ultimos5MZonaX = df_ultimos5M[df_ultimos5M['ZONA'] == nomeZona]
+    
+    # =============
+    # KPI
+    # =============
 
     #KPI1 total_servidores
     query = f"SELECT count(idServidores) FROM servidor where fkZona = {idZona}"
@@ -391,30 +339,116 @@ for zona in zonas:
     servidores_inativos = queryAtual[0]
 
     #KPI3 p99Ram_Perc
-    agora = datetime.now()
-    limite_tempo = agora - timedelta(minutes=5)
-    df_ultimos5M = dados_tratados[dados_tratados['DATA_HORA'] >= limite_tempo]
-    if not df_ultimos5M.empty:
-        p99Ram_Perc = df_ultimos5M['RAM_PERCENT'].quantile(0.99)
-    else:
-        p99Ram_Perc = 0.0
+    p99Ram_Perc = df_ultimos5MZonaX['RAM_PERCENT'].quantile(0.99)
 
     #KPI4 p99CPU_Perc
+    p99CPU_Perc = df_ultimos5MZonaX['CPU'].quantile(0.99)
 
-dados_client_analista = {
-    'KPIS': {
-        'Total de servidores (QTD)': total_servidores,
-        'Servidores Inativos (QTD)': servidores_inativos,
-        'P99 da RAM (%)': p99Ram_Perc,
-        'P99 da CPU (%)': p99CPU_Perc,
-        'Uso Disco (%)': UsoDisco_Perc,
-        'Uso Disco (TB)': UsoDisco_TB,
-        'Total Disco (TB)': TotalDisco_TB,
-        'Servidores baixa latencia (QTD)': Qtd_serv_baixaLatencia
+    #KPI5 UsoDisco_Perc
+    UsoDisco_Perc = df_ultimos5MZonaX['DISCO_PERCENT']
+
+    #KPI6 UsoDisco_TB 
+    UsoDisco_TB = (df_ultimos5MZonaX['DISCO_USADO'] / (1024 ** 4)).max()
+
+    #KPI7 TotalDisco_TB
+    TotalDisco_TB = (df_ultimos5MZonaX['DISCO_TOTAL'] / (1024 ** 4)).max()
+
+    #KPI8 Qtd_serv_baixaLatencia
+    Qtd_serv_baixaLatencia = (df_ultimos5MZonaX['LATENCIA'] < 50).sum()
+
+
+    # =============
+    # GRAFICOS
+    # =============
+
+    # UsoMedioRecursos (Media da zona toda)
+    uso_medio_cpu = df_ultimos5MZonaX['CPU'].mean()
+    uso_medio_ram = df_ultimos5MZonaX['RAM_PERCENT'].mean()
+    uso_medio_disco = df_ultimos5MZonaX['DISCO_PERCENT'].mean() 
+
+    # qtdTotalServidores 
+    qtdTotalServidores = df_ultimos5MZonaX['SERVIDOR'].nunique()
+
+    # servidoresCriticos
+    # média dos últimos 5 min de CADA servidor individualmente
+    df_media_servers = df_ultimos5MZonaX.groupby('SERVIDOR').mean(numeric_only=True)
+    
+    # Definindo a regra crítico se CPU > 85% OU RAM > 85% 
+    criticos = df_media_servers[(df_media_servers['CPU'] > 85) | (df_media_servers['RAM_PERCENT'] > 85)]
+    listaServersCriticos = criticos.index.tolist() # Retorna uma lista: ['AB043', 'AB045']
+
+
+    # ------------------------------------------
+    # TOP 3 PROCESSOS - RAM
+    # ------------------------------------------
+    # Como os processos estão em 3 colunas separadas, nós empilhamos eles para o Pandas conseguir rankear
+    p1_ram = df_ultimos5MZonaX[['PROCESSO01_RAM_N', 'PROCESSO1_RAM_T']].rename(columns={'PROCESSO01_RAM_N': 'NOME', 'PROCESSO1_RAM_T': 'USO_GB'})
+    p2_ram = df_ultimos5MZonaX[['PROCESSO2_RAM_N', 'PROCESSO2_RAM_T']].rename(columns={'PROCESSO2_RAM_N': 'NOME', 'PROCESSO2_RAM_T': 'USO_GB'})
+    p3_ram = df_ultimos5MZonaX[['PROCESSO3_RAM_N', 'PROCESSO3_RAM_T']].rename(columns={'PROCESSO3_RAM_N': 'NOME', 'PROCESSO3_RAM_T': 'USO_GB'})
+    
+    todos_processos_ram = pd.concat([p1_ram, p2_ram, p3_ram])
+    
+    # Agrupa pelo nome do processo e tira a média de uso dele na zona, pegando os 3 maiores
+    top3_ProcessosUsoRam = todos_processos_ram.groupby('NOME')['USO_GB'].mean().nlargest(3)
+
+    # somaTop3_ProcUsoRamGB (Soma do uso médio em GB dos 3 processos mais pesados)
+    somaTop3_ProcUsoRamGB = top3_ProcessosUsoRam.sum()
+
+    # porcentagemSomaTop_ProcUsoRam3GB
+    # Pegamos o Total de RAM Física dessa Zona (Média de RAM Total de um servidor * Qtd Servidores)
+    ram_fisica_total_zona = df_ultimos5MZonaX['RAM_TOTAL'].mean() * qtdTotalServidores
+    porcentagemSomaTop_ProcUsoRam = (somaTop3_ProcUsoRamGB / ram_fisica_total_zona) * 100
+
+
+    # ------------------------------------------
+    # TOP 3 PROCESSOS - CPU
+    # ------------------------------------------
+    # Mesma lógica, mas empilhando as colunas de CPU
+    p1_cpu = df_ultimos5MZonaX[['PROCESSO01_CPU_N', 'PROCESSO1_CPU_P']].rename(columns={'PROCESSO01_CPU_N': 'NOME', 'PROCESSO1_CPU_P': 'USO_PERC'})
+    p2_cpu = df_ultimos5MZonaX[['PROCESSO2_CPU_N', 'PROCESSO2_CPU_P']].rename(columns={'PROCESSO2_CPU_N': 'NOME', 'PROCESSO2_CPU_P': 'USO_PERC'})
+    p3_cpu = df_ultimos5MZonaX[['PROCESSO3_CPU_N', 'PROCESSO3_CPU_P']].rename(columns={'PROCESSO3_CPU_N': 'NOME', 'PROCESSO3_CPU_P': 'USO_PERC'})
+    
+    todos_processos_cpu = pd.concat([p1_cpu, p2_cpu, p3_cpu])
+    
+    top3_ProcessosUsoCPU = todos_processos_cpu.groupby('NOME')['USO_PERC'].mean().nlargest(3)
+    
+    # porcentagemSomaTop_ProcUsoCPU
+    porcentagemSomaTop_ProcUsoCPU = top3_ProcessosUsoCPU.sum()
+
+
+
+    # ==========================================
+    # MONTANDO O DICIONÁRIO NO FINAL DO LOOP
+    # ==========================================
+    
+    dados_client_analista[nomeZona] = {
+        'KPIS': {
+            'Total de servidores (QTD)': int(total_servidores),
+            'Servidores Inativos (QTD)': int(servidores_inativos),
+            'P99 da RAM (%)': round(p99Ram_Perc, 2),
+            'P99 da CPU (%)': round(p99CPU_Perc, 2),
+            'Uso Disco (%)': round(uso_medio_disco, 2),
+            'Uso Disco (TB)': round(UsoDisco_TB, 4),
+            'Total Disco (TB)': round(TotalDisco_TB, 4),
+            'Servidores baixa latencia (QTD)': int(Qtd_serv_baixaLatencia)
+        },
+        'GRAFICOS': {
+            'Servidores Criticos': listaServersCriticos, 
+            'Qtd total servidores': int(qtdTotalServidores),
+            'Uso Medio CPU': round(uso_medio_cpu, 2),
+            'Uso Medio RAM': round(uso_medio_ram, 2),
+            
+            
+            'Top 3 Processos RAM (GB)': top3_ProcessosUsoRam.to_dict(),
+            'Soma Top 3 RAM (GB)': round(somaTop3_ProcUsoRamGB, 2),
+            'Top 3 RAM (%)': round(porcentagemSomaTop_ProcUsoRam, 2),
+            
+            'Top 3 Processos CPU (%)': top3_ProcessosUsoCPU.to_dict(),
+            'Soma Top 3 CPU (%)': round(porcentagemSomaTop_ProcUsoCPU, 2)
+        }
     }
-}
 
-
+#TESTE
 #ENVIAR O JSON ANALISA PARA O CLIENT
 
 #upload_file(f'dados-clint-{linhaT['EMPRESA']}-analista.json', 's3-smart-data-teste', f'treated/dados-client-{linhaT['EMPRESA']}-analista-{timedelta.now()}')
@@ -444,3 +478,4 @@ dados_client_analista = {
 
 #Fechar a conexão com o mysql
 conexao.close()
+###################################
