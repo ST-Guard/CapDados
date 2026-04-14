@@ -8,6 +8,7 @@ import os
 
 
 arquivo_csv = "dados-brutos_maquina.csv"
+bucket_name = 'smartdatabucket1'
 
 print("""\033[33m
   /$$$$$$                                      /$$     /$$$$$$$              /$$              
@@ -121,16 +122,16 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
         
         
         # pegando processos com maior consumo
-
         lista_tres_ultimos = []
 
         for p in psutil.process_iter(['name', 'cpu_percent', 'memory_info', 'ppid']):
-            
-            
             info = p.info
-            if (info['name'] is None or info['memory_info'] is None):
-                a= a
-            else:
+            
+           
+            if info['name'] and info['memory_info'] is not None:
+                
+                dados_enviar = {'nome': info['name'], 'cpu': info['cpu_percent'], 'memoria': info['memory_info'], 'pid': info['ppid']}
+                lista_tres_ultimos.append(dados_enviar)
                 
 
                 dados_enviar =  {'nome': info['name'], 'cpu': info['cpu_percent'],'memoria': info['memory_info'], 'pid': info['ppid']}
@@ -247,7 +248,8 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
 
         CSV_DIC_WRITER.writerow(dados_dict)
         csvfile.flush()
-        upload_file('dados-brutos_maquina.csv','s3-smart-data-teste', 'raw/dados-brutos_maquina.csv')
+        nome_arquivo_s3 = f"raw/dados-brutos_{dados_dict['EMPRESA']}.csv"
+        upload_file('dados-brutos_maquina.csv', bucket_name, nome_arquivo_s3)
 
 
 
