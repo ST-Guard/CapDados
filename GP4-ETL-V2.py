@@ -32,7 +32,7 @@ conexao = mysql.connector.connect(
     host="127.0.0.1",  
     database="smartData",
     user="root",
-    password="",
+    password="102309",
     port="3306"  
 )
 cursor = conexao.cursor()
@@ -45,14 +45,6 @@ for linha in empresas:
 
 
 
-
-
-
-
-
-
-
-
 ##### Acesso ao bucket
 
 s3_cliente = boto3.client(
@@ -62,8 +54,12 @@ s3_cliente = boto3.client(
     aws_session_token=''
 )
 
-s3_cliente.download_file('s3-smart-data-teste', 'raw/dados-brutos_maquina.csv', 'dados-brutos_maquina.csv')
-print(f"Arquivo dados-brutos.csv baixado com sucesso.")
+bucket_name = 'smartdatabucket1'
+try:
+    s3_cliente.download_file(bucket_name, 'raw/dados-brutos_maquina.csv', 'dados-brutos_maquina.csv')
+    print(f"Arquivo dados-brutos.csv baixado com sucesso.")
+except:
+    print("Não foi encontrado o arquivo")
 
 
 def upload_file(file_name, bucket, object_name=None):
@@ -246,7 +242,7 @@ while qtd_linha_atual >= 0:
 
         
 if qtd_linha_atual <= 0: 
-    upload_file('dados-tratados.csv', 's3-smart-data-teste', f'treated/dados_tratados-{hora}')
+    upload_file('dados-tratados.csv', bucket_name, f'treated/dados_tratados-{hora}')
     print("dados enviados com sucesso!")
 
 else:
@@ -279,6 +275,38 @@ dados_client_ESPECIFICA = {}
 
 
 ########### JSON ANALISA
+
+
+########KPIS
+#Total de servidores com servidores inativos
+#R: MYSQL
+#P99 da RAM (%) (99% do tempo está x valor de RAM)
+#R: Ultimos 5 minutos
+#P99 do CPU (%) (99% do tempo está x valor de CPU)
+#R: Ultimos 5 minutos
+#Uso do Disco (%) com a quantidade e o total
+#R: Ultimos 5 minutos
+#Quantidade de servidores com baixa latência 
+#R: Ultimos 5 minutos
+
+########GRAFICOS
+#Todos os servidores mais criticos (Ranking (>85% uso))
+#R: Ultimos 5 minutos
+# Servidores_críticos(ORDENADO){
+# SERVIDOR1: {USO_CPU: 90%, USO_RAM: 90%},
+# SERVIDOR1: {USO_CPU: 80%, USO_RAM: 80%},
+# ...
+# }
+
+#Quantidade de servidores estressados VS quantidade de servidores sobrecarregados
+#Estressados (Stress): Servidores com uso alto de recursos (ex: CPU > 80%), mas que ainda processam requisições sem erro.
+#Sobrecarregados (Overloaded): Servidores que atingiram o limite e estão apresentando latência alta ou erros de timeout (5xx).
+
+#Gráfico Top 3 processos que mais estão utilizando RAM
+#R: Ultimos 5 minutos
+
+#Gráfico Top 3 processos que mais estão utilizando RAM
+#R: Ultimos 5 minutos
 
 #Querys
 
