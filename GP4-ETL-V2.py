@@ -275,6 +275,80 @@ dados_client_gestor = {}
 dados_client_analista = {}
 dados_client_ESPECIFICA = {}
 
+"""
+KPI
+Processo com maior consumo (VARCHAR)
+Quantidade de alertas (INT)
+Indice de Confiança para Manutenção Preventiva (ICMP) (%)
+Servidores Ativos (INT)
+Servidores Inativos (INT)
+
+Tendencia de degradação (DIARIA)(ULTIMO 30 DIAS) {
+29/03: {QTD_SOBRECARREADO: 30, QTD_ESTRESSADOS: 20},
+28/03: {QTD_SOBRECARREADO: 30, QTD_ESTRESSADOS: 20},
+29/03: {QTD_SOBRECARREADO: 30, QTD_ESTRESSADOS: 20}
+....
+}
+
+Pico de Uso Semanal (DIARIA)(DIA SEMANA){
+CPU:   {PICO_MAXIMO: 91%, PICO_MEDIO: 77%, PICO_ MINIMO: 30%, SEG: 30%,TER: 20% . . .},
+RAM:   {PICO_MAXIMO: 91%, PICO_MEDIO: 77%, PICO_ MINIMO: 30%, SEG: 30%,TER: 20% . . .},
+DISCO: {PICO_MAXIMO: 91%, PICO_MEDIO: 77%, PICO_ MINIMO: 30%, SEG: 30%,TER: 20% . . .},
+}
+
+"""
+
+dados_client_gestor  = { 
+    'Kpis': {
+    'processo_com_maior_uso': 'aaa',
+    'porcentagem_maior_uso_ram': 'aaaa',
+    'porcentagem_maior_uso_cpu': 'aaaaa', 
+
+    'quantidade de alertas': 'aaa',
+    'indice de confiança para manutenção preventiva': 'aaa', 
+    'servidores ativos': 'aaa',
+    'servidores inativos': 'aaa'
+    },
+    'Tendencia_Degradacao': {
+        
+    } 
+}
+
+"""
+****GESTOR PT2
+--KPI
+Processo com maior consumo (VARCHAR)
+Quantidade de alertas (INT)
+Indice de Confiança para Manutenção Preventiva (ICMP) (%)
+Servidores Ativos (INT)
+Servidores Inativos (INT)
+
+Uso de Disco vs Rede (HORA)(ULTIMO 24 HRS) {
+00:00: {UsoDisco: 30%, TrafegoRede: 20%},
+03:00: {UsoDisco: 50%, TrafegoRede: 30%},
+05:00: {UsoDisco: 70%, TrafegoRede: 20%},
+...
+}
+Pico de Disco (%)
+Horário do pico de Disco (VARCHAR)
+Pico de Rede (%)
+Horário do pico de Rede (VARCHAR)
+
+Tempo de atividade vc Latência (HORA)(ULTIMO 24 HRS) {
+00:00: {Uptime: 30%, Latencia: 20%},
+03:00: {Uptime: 50%, Latencia: 30%},
+05:00: {Uptime: 70%, Latencia: 20%},
+...
+}
+Servidor com menor UPTIME (VARCHAR)
+Horário do servidor com menor UPTIME (VARCHAR)
+Pico de Latência (MS)
+
+Servidores online (INT)
+Servidores críticos (INT)
+"""
+
+
 
 
 

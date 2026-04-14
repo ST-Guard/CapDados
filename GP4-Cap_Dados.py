@@ -27,6 +27,11 @@ print("""\033[33m
 
 
 
+
+
+
+
+
 def upload_file(file_name, bucket, object_name=None):
     session = boto3.client(
         's3',
@@ -58,7 +63,7 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
         colunas = ['EMPRESA','REGIAO', 'DATACENTER', 'ZONA', 'SERVIDOR','CPU','RAM_TOTAL','RAM_USADA','RAM_PERCENT','DISCO_TOTAL','DISCO_USADO','DISCO_PERCENT', 'LATENCIA', 'PACOTES_ENVIADOS', 'PACOTES_RECEBIDOS', 'PACOTES_PERDIDOS', 
                    'QTD_PR','PROCESSO1_CPU', 'PORCENTAGEM_PROCESSO1_CPU','PROCESSO2_CPU', 'PORCENTAGEM_PROCESSO2_CPU', 'PROCESSO3_CPU', 'PORCENTAGEM_PROCESSO3_CPU'
                    ,'PROCESSO1_RAM', 'PORCENTAGEM_PROCESSO1_RAM','PROCESSO2_RAM', 'PORCENTAGEM_PROCESSO2_RAM', 'PROCESSO3_RAM', 'PORCENTAGEM_PROCESSO3_RAM'  
-                   ,'QTD_NUCLEOS', 'USO_USER', 'USO_SISTEM', 'MEMORIA_CACHE', 'MEMORIA_LIVRE', 'MEMORIA_DISPONIVEL','SWAP_TOTAL','SWAP_USADA', 'SWAP_LIVRE', 'SWAP_PERCENT','BOOTTIME', 'DATA_HORA']
+                   ,'QTD_NUCLEOS', 'USO_USER', 'USO_SISTEM','BOOTTIME', 'DATA_HORA']
         CSV_DIC_WRITER = csv.DictWriter(csvfile, fieldnames=colunas, delimiter=';')
         
         if csvfile.tell() == 0:
@@ -110,17 +115,8 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
         uso_sistema = uso_cpu.system
 
 
-        memoria = psutil.virtual_memory()
-        # cache = memoria.cached + memoria.buffers
-        cache = 00.00
-        livre = memoria.free
-        disponivel = memoria.available
 
-        swap = psutil.swap_memory()
-        swap_total = swap.total
-        swap_usada = swap.used
-        swap_livre = swap.free
-        swap_percent = swap.percent
+
         
         
         
@@ -191,7 +187,7 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
        
         print()
         dados_dict =  {
-            'EMPRESA': 'Steam', 
+            'EMPRESA': 'STEAM', 
             'REGIAO': 'A1',
             'DATACENTER': 'DATA_CENTER_01',
             'ZONA': 'A1',
@@ -223,15 +219,9 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
             'QTD_NUCLEOS': qtd_nucleos,
             'USO_USER':  uso_user,
             'USO_SISTEM': uso_sistema,
-            'MEMORIA_CACHE': cache,
-            'MEMORIA_LIVRE': livre,
-            'SWAP_TOTAL': swap_total,
-            'SWAP_USADA': swap_usada,
-            'SWAP_LIVRE': swap_livre,
-            'SWAP_PERCENT': swap_percent, 
-            'MEMORIA_DISPONIVEL': disponivel,
             'BOOTTIME': bootime,     
-            'DATA_HORA': tempo_agora}
+            'DATA_HORA': tempo_agora
+            }
         
 
         print(f"""
