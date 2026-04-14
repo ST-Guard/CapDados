@@ -26,6 +26,8 @@ print("""\033[33m
 \033[m""")
 
 
+token = input("digite")
+servidor = input("Digite o codigo do servidor: ")
 
 
 
@@ -126,19 +128,17 @@ with open(arquivo_csv, 'a', newline='') as csvfile:
 
         for p in psutil.process_iter(['name', 'cpu_percent', 'memory_info', 'ppid']):
             info = p.info
-            
+    
            
-            if info['name'] and info['memory_info'] is not None:
+            if info['name'] or info['memory_info'] is not None:
                 
                 dados_enviar = {'nome': info['name'], 'cpu': info['cpu_percent'], 'memoria': info['memory_info'], 'pid': info['ppid']}
                 lista_tres_ultimos.append(dados_enviar)
                 
 
-                dados_enviar =  {'nome': info['name'], 'cpu': info['cpu_percent'],'memoria': info['memory_info'], 'pid': info['ppid']}
-                lista_tres_ultimos.append(dados_enviar)
 
 
-     
+
 
 
         top_maior_processo_cpu= lista_tres_ultimos[0]
