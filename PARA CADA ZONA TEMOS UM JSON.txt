@@ -1,0 +1,27 @@
+PARA CADA ZONA TEMOS UM JSON
+SÂO TRÊS ZONAS 
+O ANALISTA SÒ VE UMA ZONA
+
+
+
+dados-cliente-empresaX-analista-DD-MM-YY-HH-MM-SS{
+
+
+ZONA1: {
+	KPIS: {},
+	GRAFICOS {}
+}
+
+ZONA2: {
+	KPIS: {},
+	GRAFICOS {}
+}
+
+ZONA3: {
+	KPIS: {},
+	GRAFICOS {}
+}
+
+
+
+}
