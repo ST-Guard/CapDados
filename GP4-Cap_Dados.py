@@ -39,7 +39,7 @@ def upload_file(file_name, bucket, object_name=None):
         aws_access_key_id='',
         aws_secret_access_key='',
         aws_session_token=''
-    )
+)
     # If S3 object_name was not specified, use file_name
     if object_name is None:
         object_name = os.path.basename('/home/valle/Área de trabalho/Caculo computacional/CapDados/dados-brutos_maquina.csv')

@@ -55,11 +55,12 @@ s3_cliente = boto3.client(
 )
 
 bucket_name = 'smartdatabucket1'
+arquivo_download = 'dados-brutos_STEAM.csv'
 try:
-    s3_cliente.download_file(bucket_name, 'raw/dados-brutos_maquina.csv', 'dados-brutos_maquina.csv')
+    s3_cliente.download_file(bucket_name, f'raw/{arquivo_download}', 'dados_brutos.csv')
     print(f"Arquivo dados-brutos.csv baixado com sucesso.")
-except:
-    print("Não foi encontrado o arquivo")
+except Exception as e:
+    print(f"Não foi encontrado o arquivo: {e}")
 
 
 def upload_file(file_name, bucket, object_name=None):
@@ -73,7 +74,7 @@ def upload_file(file_name, bucket, object_name=None):
     return True
 
 
-caminho_csv = 'dados-brutos_maquina.csv'
+caminho_csv = 'dados_brutos.csv'
 dados_brutos = pd.read_csv(caminho_csv, sep=';')
 
 
@@ -84,6 +85,7 @@ dados_brutos['DATA_HORA'] = pd.to_datetime(dados_brutos['DATA_HORA'], format="%m
 limite_tempo = pd.Timestamp.now() - timedelta(minutes=5)
 df_filtrado = dados_brutos[dados_brutos['DATA_HORA'] >= limite_tempo].copy()
 
+print(f"Encontradas {len(df_filtrado)} linhas para processar.")
 
 if df_filtrado.empty:
     print("Nenhum dado encontrado nos ultimos 5 minutos")
@@ -244,16 +246,18 @@ for zona in zonas:
     # =============
 
     #KPI1 total_servidores
-    query = f"SELECT count(idServidores) FROM servidor where fkZona = {idZona}"
+    query = f"SELECT count(idServidor) FROM servidor where fkZona = {idZona}"
     cursor.execute(query)
     queryAtual = cursor.fetchall()
-    total_servidores = queryAtual[0]
+    total_servidores = queryAtual[0][0]
+    
     
     #KPI2 servidores_inativos
-    query = f"SELECT count(idServidores) FROM servidor where fkZona = {idZona} AND estado = 'Inativo'"
+    query = f"SELECT count(idServidor) FROM servidor where fkZona = {idZona} AND estado = 'Inativo'"
     cursor.execute(query)
     queryAtual = cursor.fetchall()
-    servidores_inativos = queryAtual[0]
+    servidores_inativos = queryAtual[0][0]
+    
 
     #KPI3 p99Ram_Perc
     p99Ram_Perc = df_ultimos5MZonaX['RAM_PERCENT'].quantile(0.99)
@@ -262,7 +266,7 @@ for zona in zonas:
     p99CPU_Perc = df_ultimos5MZonaX['CPU'].quantile(0.99)
 
     #KPI5 UsoDisco_Perc
-    UsoDisco_Perc = df_ultimos5MZonaX['DISCO_PERCENT']
+    UsoDisco_Perc = df_ultimos5MZonaX['DISCO_PERCENT'].max()
 
     #KPI6 UsoDisco_TB 
     UsoDisco_TB = (df_ultimos5MZonaX['DISCO_USADO'] / (1024 ** 4)).max()
@@ -274,7 +278,106 @@ for zona in zonas:
     Qtd_serv_baixaLatencia = (df_ultimos5MZonaX['LATENCIA'] < 50).sum()
 
 
+    # =====================
+    # GRAFICOS
+    # =====================
+
+    # UsoMedioRecursos (Media da zona toda)
+    uso_medio_cpu = df_ultimos5MZonaX['CPU'].mean() 
+    uso_medio_ram = df_ultimos5MZonaX['RAM_PERCENT'].mean()
+    uso_medio_disco = df_ultimos5MZonaX['DISCO_PERCENT'].mean() 
+
+    # qtdTotalServidores 
+    qtdTotalServidores = df_ultimos5MZonaX['SERVIDOR'].nunique()
+
+    # servidoresCriticos
+    df_media_servers = df_ultimos5MZonaX.groupby('SERVIDOR').mean(numeric_only=True)
     
+    # Definindo a regra crítico se CPU > 85% OU RAM > 85% 
+    criticos = df_media_servers[(df_media_servers['CPU'] > 85) | (df_media_servers['RAM_PERCENT'] > 85)]
+    listaServersCriticos = criticos.index.tolist() # Retorna uma lista: ['AB043', 'AB045']
+
+    # ------------------------------------------
+    # TOP 3 PROCESSOS - RAM
+    # ------------------------------------------
+
+    # Como os processos estão em 3 colunas separadas, nós empilhamos eles para o Pandas conseguir rankear
+    p1_ram = df_ultimos5MZonaX[['PROCESSO1_RAM', 'PORCENTAGEM_PROCESSO1_RAM']].rename(columns={'PROCESSO1_RAM': 'NOME', 'PORCENTAGEM_PROCESSO1_RAM': 'USO_BYTES'})
+    p2_ram = df_ultimos5MZonaX[['PROCESSO2_RAM', 'PORCENTAGEM_PROCESSO2_RAM']].rename(columns={'PROCESSO2_RAM': 'NOME', 'PORCENTAGEM_PROCESSO2_RAM': 'USO_BYTES'})
+    p3_ram = df_ultimos5MZonaX[['PROCESSO3_RAM', 'PORCENTAGEM_PROCESSO3_RAM']].rename(columns={'PROCESSO3_RAM': 'NOME', 'PORCENTAGEM_PROCESSO3_RAM': 'USO_BYTES'})
+
+    todos_processos_ram = pd.concat([p1_ram, p2_ram, p3_ram])
+    
+    todos_processos_ram['USO_GB'] = todos_processos_ram['USO_BYTES'] / (1024 ** 3)
+
+    # Agrupa pelo nome do processo e tira a média de uso dele na zona, pegando os 3 maiores
+    top3_ProcessosUsoRam = todos_processos_ram.groupby('NOME')['USO_GB'].mean().nlargest(3)
+
+    # somaTop3_ProcUsoRamGB (Soma do uso médio em GB dos 3 processos mais pesados)
+    somaTop3_ProcUsoRamGB = top3_ProcessosUsoRam.sum()
+
+    # porcentagemSomaTop_ProcUsoRam3GB
+    # Pegamos o Total de RAM Física dessa Zona (Média de RAM Total de um servidor * Qtd Servidores)
+    ram_fisica_total_zona = df_ultimos5MZonaX['RAM_TOTAL'].mean() * qtdTotalServidores
+    porcentagemSomaTop_ProcUsoRam = (somaTop3_ProcUsoRamGB / ram_fisica_total_zona) * 100
+
+
+    # ------------------------------------------
+    # TOP 3 PROCESSOS - CPU
+    # ------------------------------------------
+    # Mesma lógica, mas empilhando as colunas de CPU
+    p1_cpu = df_ultimos5MZonaX[['PROCESSO1_CPU', 'PORCENTAGEM_PROCESSO1_CPU']].rename(columns={'PROCESSO1_CPU': 'NOME', 'PORCENTAGEM_PROCESSO1_CPU': 'USO_PERC'})
+    p2_cpu = df_ultimos5MZonaX[['PROCESSO2_CPU', 'PORCENTAGEM_PROCESSO2_CPU']].rename(columns={'PROCESSO2_CPU': 'NOME', 'PORCENTAGEM_PROCESSO2_CPU': 'USO_PERC'})
+    p3_cpu = df_ultimos5MZonaX[['PROCESSO3_CPU', 'PORCENTAGEM_PROCESSO3_CPU']].rename(columns={'PROCESSO3_CPU': 'NOME', 'PORCENTAGEM_PROCESSO3_CPU': 'USO_PERC'})
+
+    todos_processos_cpu = pd.concat([p1_cpu, p2_cpu, p3_cpu])
+    
+    top3_ProcessosUsoCPU = todos_processos_cpu.groupby('NOME')['USO_PERC'].mean().nlargest(3)
+    
+    # porcentagemSomaTop_ProcUsoCPU
+    porcentagemSomaTop_ProcUsoCPU = top3_ProcessosUsoCPU.sum()
+
+
+    print("Servidores criticos")
+    print(listaServersCriticos)
+    print("qtdTotalServidores")
+    print(qtdTotalServidores)
+    print("top3_ProcessosUsoRam")
+    print(top3_ProcessosUsoRam)
+    print("top3_ProcessosUsoCPU")
+    print(top3_ProcessosUsoCPU)
+
+    
+    # ==========================================
+    # MONTANDO O DICIONÁRIO NO FINAL DO LOOP
+    # ==========================================
+    
+    dados_client_analista[nomeZona] = {
+        'KPIS': {
+            'Total de servidores (QTD)': int(total_servidores),
+            'Servidores Inativos (QTD)': int(servidores_inativos),
+            'P99 da RAM (%)': round(p99Ram_Perc, 2),
+            'P99 da CPU (%)': round(p99CPU_Perc, 2),
+            'Uso Disco (%)': round(uso_medio_disco, 2),
+            'Uso Disco (TB)': round(UsoDisco_TB, 4),
+            'Total Disco (TB)': round(TotalDisco_TB, 4),
+            'Servidores baixa latencia (QTD)': int(Qtd_serv_baixaLatencia)
+        },
+        'GRAFICOS': {
+            'Servidores Criticos': listaServersCriticos, 
+            'Qtd total servidores': int(qtdTotalServidores),
+            'Uso Medio CPU': round(uso_medio_cpu, 2),
+            'Uso Medio RAM': round(uso_medio_ram, 2),
+            
+            
+            'Top 3 Processos RAM (GB)': top3_ProcessosUsoRam.to_dict(),
+            'Soma Top 3 RAM (GB)': round(somaTop3_ProcUsoRamGB, 2),
+            'Top 3 RAM (%)': round(porcentagemSomaTop_ProcUsoRam, 2),
+            
+            'Top 3 Processos CPU (%)': top3_ProcessosUsoCPU.to_dict(),
+            'Soma Top 3 CPU (%)': round(porcentagemSomaTop_ProcUsoCPU, 2)
+        }
+    }
 
 #TESTE
 #ENVIAR O JSON ANALISA PARA O CLIENT
