@@ -283,12 +283,12 @@ else:
                 ----------------------------------------------------
 
 
-        """)
+               """)
 
                 CSV_DIC_WRITER.writerow(dados_dict)
                 csvfile.flush()
-                nome_arquivo_s3 = f"raw/dados-brutos_{dados_dict['EMPRESA']}.csv"
-                upload_file('dados-brutos_maquina.csv', bucket_name, nome_arquivo_s3)
+                nome_arquivo_s3 = f"raw/{dados_dict['EMPRESA']}_{dados_dict['DATACENTER']}_{dados_dict['ZONA']}_{dados_dict['SERVIDOR']}_dadosBrutos.csv"
+                upload_file('dados-brutos_maquina.csv', 's3-smart-data-teste', nome_arquivo_s3)
 
 
 
