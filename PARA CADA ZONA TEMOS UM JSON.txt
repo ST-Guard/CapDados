@@ -4,6 +4,21 @@ O ANALISTA SÒ VE UMA ZONA
 
 
 
+EMPRESAS-ANALISTA{
+STEAM-ANALISTA {
+
+
+},
+
+GOGE-ANALISTA {
+
+	
+}
+
+
+}
+
+
 dados-cliente-empresaX-analista-DD-MM-YY-HH-MM-SS{
 
 
