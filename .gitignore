@@ -1,0 +1,5 @@
+.env
+*.csv
+*.xlsx
+dados-brutos_maquina*
+dados-tratados*
