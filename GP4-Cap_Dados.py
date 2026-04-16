@@ -205,9 +205,6 @@ else:
                 for produto_agora in lista_tres_ultimos:
 
 
-
-
-
                     if (top_maior_processo_cpu['cpu'] < produto_agora['cpu']):
                         top_terceiro_processo_cpu = top_segundo_processo_cpu
                         top_segundo_processo_cpu = top_maior_processo_cpu
