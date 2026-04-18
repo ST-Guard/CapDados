@@ -438,10 +438,10 @@ while True:
             
         
 
+        ########################################## JSON GESTOR ##########################################
 
 
-
-
+        ########################################## JSON ESPECIFICA ##########################################
 
 
     print("Processamento concluído. Aguardando 5 minutos para o próximo ciclo...")
