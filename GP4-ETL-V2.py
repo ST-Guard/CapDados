@@ -208,7 +208,7 @@ while True:
         df_silver.to_csv('dados-tratados.csv', sep=';', index=False, mode='a', header=not pd.io.common.file_exists('dados-tratados.csv'))
 
         hora_envio = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S') 
-        upload_file('dados-tratados.csv', bucket_name, f'treated/dados_tratados-{hora_envio}.csv')
+        upload_file('dados-tratados.csv', bucket_name, f'treated/dados_tratados.csv')
         print("Dados tratados e enviados com sucesso!")
 
 
@@ -430,7 +430,7 @@ while True:
 
             print(f"Arquivo {nome_arquivo_json} criado com sucesso!")
 
-            # Fazendo o upload apontando o arquivo correto e colocando a extensão .json no final do destino
+            # Fazendo o upload apontando o arquivo correto  e colocando a extensão .json no final do destino
             caminho_s3 = f'client/dados-client-{nome_empresa_atual}-analista.json'
             upload_file(nome_arquivo_json, bucket_name, caminho_s3)
         else:
