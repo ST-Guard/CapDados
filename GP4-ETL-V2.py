@@ -7,6 +7,8 @@ import os
 import mysql.connector
 import json
 from dotenv import load_dotenv
+from colorama import Fore, Style, init
+#pip install colorama
 #pip install python-dotenv
 #pip install mysql-connector-python
 #pip install pandas
@@ -92,7 +94,8 @@ def json_serial(obj):
 
 
 while True:
-    print("\n--- INICIANDO CICLO DE PROCESSAMENTO (A cada 5 minutos) ---")
+    print(Fore.WHITE + "\n ---------- INICIANDO CICLO DE PROCESSAMENTO (A cada 5 minutos) ----------" + Style.RESET_ALL)
+    print()
 
 
     ################################################################ Tratando os dados para o SILVER ################################################################
@@ -123,6 +126,7 @@ while True:
     os.makedirs(pasta_local_destino, exist_ok=True)
     lista_dataframes = [] 
     
+    print("\033[38;5;130m========= BRONZE ============\033[0m")
     for resposta in resposta_s3['Contents']:
         caminho_s3 = resposta['Key'] # Ex: 'raw/Steam_SP_ZonaA_AB043.csv'
         
@@ -130,7 +134,6 @@ while True:
         if caminho_s3.endswith('/') or resposta['Size'] == 0:
             continue
         
-
         nome_puro = os.path.basename(caminho_s3)
         # Cria um nome local temporario para o arquivo baixado
         nome_arquivo_local = os.path.join(pasta_local_destino, nome_puro)
@@ -157,13 +160,13 @@ while True:
 
     # Junta as dezenas de CSVs de varias maquinas em uma tabela UNICA gigante (dados_brutos)
     dados_brutos = pd.concat(lista_dataframes, ignore_index=True)
-    print(f"Sucesso! {len(lista_dataframes)} arquivos combinados. Total de {len(dados_brutos)} linhas.")
+    print(Fore.GREEN + f"Sucesso! {len(lista_dataframes)} arquivos combinados. Total de {len(dados_brutos)} linhas." + Style.RESET_ALL)
 
 
 
     ######### A PARTIR DAQUI, É O TRATAMENTE DAS COLUNAS (DEPOIS DE UNIFICAR TODOS OS CSVS)
-
-    dados_brutos['DATA_HORA'] = pd.to_datetime(dados_brutos['DATA_HORA'], format="%m/%d/%y %H:%M:%S %A")
+    print("\033[37m========= SILVER ============\033[0m")
+    dados_brutos['DATA_HORA'] = pd.to_datetime(dados_brutos['DATA_HORA'], format="%Y-%m-%d %H:%M:%S.%f", errors='coerce')
     limite_tempo = pd.Timestamp.now() - timedelta(minutes=5)
     df_filtrado = dados_brutos[dados_brutos['DATA_HORA'] >= limite_tempo].copy()
 
@@ -209,13 +212,13 @@ while True:
 
         hora_envio = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S') 
         upload_file('dados-tratados.csv', bucket_name, f'treated/dados_tratados.csv')
-        print("Dados tratados e enviados com sucesso!")
+        print(Fore.GREEN +"Dados tratados e enviados com sucesso para a AWS!"+ Style.RESET_ALL)
 
 
 
 
     ################################################################ TRATANDO os DADOS PARA O CLIENT ################################################################
-
+    print("\033[38;2;255;215;0m========= GOLD ============\033[0m")
 
     #PARA CADA EMPRESA SERÀ GERADO TRÊS CSVS: GESTOR, ANALISTA, ESPECIFICA 
     #OLHAR O TXT!
@@ -270,6 +273,7 @@ while True:
     for empresa in empresas:
         dados_client_analista = {} 
         nome_empresa_atual = str(empresa[1])
+        print(Fore.LIGHTWHITE_EX + f"Analisando dados para a empresa {nome_empresa_atual} " + Style.RESET_ALL)
 
         for zona in zonas:
             nomeZona = str(zona[1]).strip().upper() 
@@ -288,12 +292,13 @@ while True:
 
             #VErifica se foi encontrado alguma informação para essa zona
             if df_ultimos5MZonaX.empty:
-                print(f"Nenhum dado encontrado para a zona: {nomeZona} ")
+                print(Fore.RED + f"Nenhum dado encontrado para a zona: {nomeZona} " + Style.RESET_ALL)
                 dados_client_analista[nomeZona] = {
                 'KPIS': 'Nenhum dado encontrado para essa zona!',
                 'GRAFICOS': 'Nenhum dado encontrado para essa zona!'
                 }
                 continue
+            print(Fore.LIGHTMAGENTA_EX+ f"Dados encontrados para a zona: {nomeZona}!" + Style.RESET_ALL)
             
 
             # *******************************
@@ -347,14 +352,16 @@ while True:
             #Em seguida faz uma media das colunas que somente são numericas, ignorando todas as colunas de texto
             #OBS: O indece dessa lista passa a ser os valores de SERVIDOR
 
-            # crítico se CPU > 85% OU RAM > 85% 
-            criticos = df_media_servers[(df_media_servers['CPU'] > 85) | (df_media_servers['RAM_PERCENT'] > 85)]
-            listaServersCriticos = criticos.index.tolist() # resultado ex: lista: ['AB043', 'AB045']
-            #Esse index diz para fazer uma lista somente com o indice da lista criticos. Que o indece são os valores de df_ultimos5MZonaX.SERVIDOR
-
-            if(listaServersCriticos == []):
+            criticos = df_media_servers[(df_media_servers['CPU'] > 5) | (df_media_servers['RAM_PERCENT'] > 5)]
+            #Aqui é complicado, pegamos os servidores criticos com a CPU > 80 e a RAM PERCENT > 90
+            if criticos.empty:
                 listaServersCriticos = 'Nenhum servidor critico encontrado!'
-
+            else:
+                df_criticos_formatado = criticos[['CPU', 'RAM_PERCENT']].rename(
+                    columns={'CPU': 'USO_CPU', 'RAM_PERCENT': 'USO_RAM'}
+                ).round(2)
+                listaServersCriticos = df_criticos_formatado.to_dict(orient='index')
+            qtdServidoresCritivos = len(criticos)
 
             # TOP 3 PROCESSOS - RAM
             p1_ram = df_ultimos5MZonaX[['PROCESSO1_RAM', 'PORCENTAGEM_PROCESSO1_RAM']].rename(columns={'PROCESSO1_RAM': 'NOME', 'PORCENTAGEM_PROCESSO1_RAM': 'USO_BYTES'})
@@ -387,11 +394,49 @@ while True:
             # porcentagemSomaTop_ProcUsoCPU
             porcentagemSomaTop_ProcUsoCPU = top3_ProcessosUsoCPU.sum()
 
+            # =================================================================
+            # GRÁFICO DE LINHA: ESTRESSADOS VS SOBRECARREGADOS (ÚLTIMOS 7 DIAS)
+            # VOU PEGAR DOS ULTIMSO 7 DIAS, ULTIMA SEMANA
+            # SIM, LOUCURA
+
+            limite_7_dias = agora - timedelta(days=7)
+            df_7dias_zona = dados_brutos[(dados_brutos['DATA_HORA'] >= limite_7_dias)].copy()
+            df_7dias_zona['ZONA'] = df_7dias_zona['ZONA'].astype(str).str.strip().str.upper()
+            df_7dias_zona = df_7dias_zona[(df_7dias_zona['ZONA'] == nomeZona)].copy()
+            #To filtrando a zona e pegando os dados dos ultimos 7 dias
+           
+            if not df_7dias_zona.empty:
+               
+                df_7dias_zona['DIA'] = df_7dias_zona['DATA_HORA'].dt.date.astype(str)
+                
+                df_media_diaria = df_7dias_zona.groupby(['DIA', 'SERVIDOR'])[['CPU', 'RAM_PERCENT']].mean(numeric_only=True).reset_index()
+                df_media_diaria['Qtd_Sobrecarregados'] = ((df_media_diaria['CPU'] > 85) | (df_media_diaria['RAM_PERCENT'] > 85)).astype(int)
+
+                df_media_diaria['Qtd_Estressados'] = (
+                    ((df_media_diaria['CPU'] > 70) & (df_media_diaria['CPU'] <= 85)) | 
+                    ((df_media_diaria['RAM_PERCENT'] > 70) & (df_media_diaria['RAM_PERCENT'] <= 85))
+                ).astype(int)
+
+                agrupado_por_dia = df_media_diaria.groupby('DIA')[['Qtd_Estressados', 'Qtd_Sobrecarregados']].sum()
+
+                historico_7_dias_dict = agrupado_por_dia.to_dict(orient='index')
+            else:
+                historico_7_dias_dict = "Sem dados suficientes para os últimos 7 dias."
+
+            
+            
+            
+            
+            
+            
+            # =================================================================
+            
             # MONTANDO O DICIONÁRIO NO FINAL DO LOOP
             dados_client_analista[nomeZona] = {
                 'KPIS': {
                     'Total de servidores (QTD)': int(total_servidores),
                     'Servidores Inativos (QTD)': int(servidores_inativos),
+                    'Servidores Criticos (QTD)': int(qtdServidoresCritivos),
                     'P99 da RAM (%)': round(p99Ram_Perc, 2),
                     'P99 da CPU (%)': round(p99CPU_Perc, 2),
                     'Uso Disco (%)': round(uso_medio_disco, 2),
@@ -404,6 +449,7 @@ while True:
                     'Qtd total servidores': int(qtdTotalServidores),
                     'Uso Medio CPU': round(uso_medio_cpu, 2),
                     'Uso Medio RAM': round(uso_medio_ram, 2),
+                    'Servidores estressados X Sobrecarregados': historico_7_dias_dict,
 
 
                     'Top 3 Processos RAM (GB)': top3_ProcessosUsoRam.to_dict(),
@@ -428,7 +474,7 @@ while True:
             with open(caminho_local_json, 'w', encoding='utf-8') as f:
                 json.dump(dados_client_analista, f, indent=4, ensure_ascii=False, default=json_serial)
 
-            print(f"Arquivo {nome_arquivo_json} criado com sucesso!")
+            print(Fore.GREEN + f"Arquivo {nome_arquivo_json} criado com sucesso!"+ Style.RESET_ALL)
 
             # Fazendo o upload apontando o arquivo correto  e colocando a extensão .json no final do destino
             caminho_s3 = f'client/dados-client-{nome_empresa_atual}-analista.json'
@@ -444,7 +490,7 @@ while True:
         ########################################## JSON ESPECIFICA ##########################################
 
 
-    print("Processamento concluído. Aguardando 5 minutos para o próximo ciclo...")
+    print(Fore.WHITE + "Processamento concluído. Aguardando 5 minutos para o próximo ciclo..." + Style.RESET_ALL)
     time.sleep(150)
 
 

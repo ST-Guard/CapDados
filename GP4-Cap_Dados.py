@@ -146,17 +146,19 @@ else:
                 tempo_agora = datetime.now()
                 dia = tempo_agora.strftime('%D %H:%M:%S')
                 dia_semana = tempo_agora.strftime('%A')
-                tempo_agora = f"{dia}"
+                tempo_agora = datetime.now()
                 contagem_processos = len(psutil.pids())
                 
         
 
-
-                #pegando rede
-                instancia_speed_test = speedtest.Speedtest(secure=True)
-                instancia_speed_test.get_best_server()
-                bootime = psutil.boot_time()
-
+                try:
+                    #pegando rede
+                    instancia_speed_test = speedtest.Speedtest(secure=True)
+                    instancia_speed_test.get_best_server()
+                    bootime = psutil.boot_time()
+                except Exception as e:
+                    print(f"Speedtest bloqueado ou sem conexão. Ping zerado. Erro: {e}")
+                    ping = 0.0  # Valor padrão para o script não morrer!
 
                 ping = instancia_speed_test.results.ping
 
@@ -255,7 +257,7 @@ else:
                     'REGIAO': f'{servidor[0][12]}',
                     'DATACENTER': f'{servidor[0][21]}',
                     'ZONA': f'{servidor[0][6]}',
-                    'SERVIDOR': {servidor[0][1]}, 
+                    'SERVIDOR': f'{servidor[0][1]}', 
                     'CPU': cpu_usage * 2, 
                     'RAM_TOTAL': ram.total, 
                     'RAM_USADA': ram.used, 
