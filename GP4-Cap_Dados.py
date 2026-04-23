@@ -6,11 +6,16 @@ import speedtest # baixar como pip install speedtest-cli
 import boto3 
 import os
 import mysql.connector
+from dotenv import load_dotenv
+#pip install python-dotenv
 #pip install mysql-connector-python
 
 
 arquivo_csv = "dados-brutos_maquina.csv"
 bucket_name = 'smartdatabucket1'
+
+#STE12345          
+#SERVIDOR-DC01-WEB-05
 
 print("""\033[33m
   /$$$$$$                                      /$$     /$$$$$$$              /$$              
@@ -28,32 +33,55 @@ print("""\033[33m
 \033[m""")
 
 
+
+bucket_name = 'smartdatabucket1'
+
+
+load_dotenv()
+
+
+chave_acesso = os.getenv('AWS_ACCESS_KEY_ID')
+chave_secreta = os.getenv('AWS_SECRET_ACCESS_KEY')
+token_sessao = os.getenv('AWS_SESSION_TOKEN')
+
+# Banco de Dados
+banco_host = os.getenv('DB_HOST')
+banco_user = os.getenv('DB_USER')
+banco_senha = os.getenv('DB_PASSWORD')
+banco_nome = os.getenv('DB_NAME')
+banco_porta = int(os.getenv('DB_PORT', 3306))
+
+
+
+
+
+
 def upload_file(file_name, bucket, object_name=None):
     session = boto3.client(
         's3',
-        aws_access_key_id='',
-        aws_secret_access_key='',
-        aws_session_token=''
+          aws_access_key_id=chave_acesso,
+        aws_secret_access_key=chave_secreta,
+        aws_session_token=token_sessao 
     )
     # If S3 object_name was not specified, use file_name
     if object_name is None:
-        object_name = os.path.basename('/home/valle/Área de trabalho/Caculo computacional/CapDados/dados-brutos_maquina.csv')
+        object_name = file_name
 
     try:
         response = session.upload_file(file_name, bucket, object_name)
-    except:
-        return False
+    except ValueError as e:
+        print(f"Erro ao enviar para o S3: {e}")
     return True
 
 
 
 
 conexao = mysql.connector.connect(
-    host="127.0.0.1",  
-    database="smartData",
-    user="root",
-    password="",
-    port="3306"  
+        host=banco_host,
+        user=banco_user,
+        password=banco_senha,
+        database=banco_nome,
+        port=banco_porta
 )
 
 
@@ -76,7 +104,7 @@ empresa = cursor.fetchall()
 if len(empresa) == 0:
     print("TOKEN INVALIDO!")
 else:
-    servidor = input("Digite o codigo do servidor: ")
+    servidor = input("Digite o nome do servidor: ")
     query_servidor = f"SELECT * FROM servidor AS s JOIN zona ON s.fkZona = idZona JOIN regiao ON fkRegiaoDatacenter = fkDataCenter JOIN empresa ON fkRegiaoEmpresa = idEmpresa JOIN datacenter ON fkRegiaoDatacenter = idDatacenter WHERE idEMpresa = {empresa[0][0]} AND  s.nome = '{servidor}';"
     cursor.execute(query_servidor)
     servidor = cursor.fetchall()
@@ -84,7 +112,7 @@ else:
         print("SERVIDOR NÃO É VALIDO")
     else:
         print("SERVIDOR CORRETO INICIANDO A CAPTAÇÃO DOS DADOS")
-
+        arquivo_csv = f"dados-brutos-{servidor[0][1]}.csv"
 
         
  
@@ -165,7 +193,7 @@ else:
                     info = p.info
 
 
-                    if info['name'] or info['memory_info'] is not None:
+                    if info['name'] and info['memory_info'] is not None:
 
                         dados_enviar = {'nome': info['name'], 'cpu': info['cpu_percent'], 'memoria': info['memory_info'], 'pid': info['ppid']}
                         lista_tres_ultimos.append(dados_enviar)
@@ -227,7 +255,7 @@ else:
                     'REGIAO': f'{servidor[0][12]}',
                     'DATACENTER': f'{servidor[0][21]}',
                     'ZONA': f'{servidor[0][6]}',
-                    'SERVIDOR': f'SERVIDOR-DC01-JGS-01', 
+                    'SERVIDOR': {servidor[0][1]}, 
                     'CPU': cpu_usage * 2, 
                     'RAM_TOTAL': ram.total, 
                     'RAM_USADA': ram.used, 
@@ -292,7 +320,7 @@ else:
                 CSV_DIC_WRITER.writerow(dados_dict)
                 csvfile.flush()
                 nome_arquivo_s3 = f"raw/{dados_dict['EMPRESA']}_{dados_dict['DATACENTER']}_{dados_dict['ZONA']}_{dados_dict['SERVIDOR']}_dadosBrutos.csv"
-                upload_file('dados-brutos_maquina.csv', 's3-smart-data-teste', nome_arquivo_s3)
+                upload_file(arquivo_csv, bucket_name, nome_arquivo_s3)
 
 
 
