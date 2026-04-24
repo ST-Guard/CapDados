@@ -73,8 +73,10 @@ def upload_file(file_name, bucket, object_name=None):
     if object_name is None:
         object_name = os.p(file_name)
     try:
+        print("mandado pra aws")
         response = s3_cliente.upload_file(file_name, bucket, object_name)
     except:
+        print("nao foi enviado")
         return False
     return True
 
@@ -167,7 +169,7 @@ while True:
     ######### A PARTIR DAQUI, É O TRATAMENTE DAS COLUNAS (DEPOIS DE UNIFICAR TODOS OS CSVS)
     print("\033[37m========= SILVER ============\033[0m")
     dados_brutos['DATA_HORA'] = pd.to_datetime(dados_brutos['DATA_HORA'], format="%Y-%m-%d %H:%M:%S.%f", errors='coerce')
-    limite_tempo = pd.Timestamp.now() - timedelta(minutes=60)
+    limite_tempo = pd.Timestamp.now() - timedelta(minutes=5)
     df_filtrado = dados_brutos[dados_brutos['DATA_HORA'] >= limite_tempo].copy()
 
     if df_filtrado.empty:
@@ -477,7 +479,7 @@ while True:
 
             # Fazendo o upload apontando o arquivo correto  e colocando a extensão .json no final do destino
             caminho_s3 = f'client/dados-client-{nome_empresa_atual}-analista.json'
-            upload_file(nome_arquivo_json, bucket_name, caminho_s3)
+            upload_file(caminho_local_json, bucket_name, caminho_s3)
         else:
             print(f"Não foi encontrado nenhum dado para a empresa: {nome_empresa_atual}")
 
@@ -690,7 +692,7 @@ while True:
 
             # Fazendo o upload apontando o arquivo correto  e colocando a extensão .json no final do destino
             caminho_s3 = f'client/dados-client-{nome_empresa_atual}-especifica.json'
-            upload_file(nome_arquivo_json, bucket_name, caminho_s3)
+            upload_file(caminho_local_json, bucket_name, caminho_s3)
         else:
             print(f"Não foi encontrado nenhum dado para a empresa: {nome_empresa_atual}")
             
@@ -703,7 +705,7 @@ while True:
 
 
     print(Fore.WHITE + "Processamento concluído. Aguardando 5 minutos para o próximo ciclo..." + Style.RESET_ALL)
-    time.sleep(20)
+    time.sleep(120)
 
 
 
