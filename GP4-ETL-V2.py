@@ -73,8 +73,10 @@ def upload_file(file_name, bucket, object_name=None):
     if object_name is None:
         object_name = os.p(file_name)
     try:
+        print("mandado pra aws")
         response = s3_cliente.upload_file(file_name, bucket, object_name)
     except:
+        print("nao foi enviado")
         return False
     return True
 
@@ -94,7 +96,7 @@ def json_serial(obj):
 
 
 while True:
-    print(Fore.WHITE + "\n ---------- INICIANDO CICLO DE PROCESSAMENTO (A cada 5 minutos) ----------" + Style.RESET_ALL)
+    print(Fore.WHITE + "\n ---------- INICIANDO CICLO DE PROCESSAMENTO ETL (A cada 5 minutos) ----------" + Style.RESET_ALL)
     print()
 
 
@@ -103,9 +105,9 @@ while True:
 
     ####INSTALANDO TODOS OS DADOS DO RAW
     
-    bucket_name = 'smartdatabucket1'
+    bucket_name = 'bucket-22-04-26'
     prefixo_pasta = 'raw/'
-    pasta_local_destino = 'dados_brutos'
+    pasta_local_destino = 'dados_brutos_ram'
     
     try:
         #LISTANDO TODOS OS ARQUIVOS DO RAAAW
@@ -228,9 +230,8 @@ while True:
     # EXEMPLO: dados-client-empresaX-gestor
     # EXEMPLO: dados-client-empresaX-analista
 
-
-    dados_client_gestor = {}
     dados_client_analista = {}
+    dados_client_gestor = {}
     dados_client_especifica = {}
 
     ########################################## JSON ANALISA ##########################################
@@ -263,7 +264,7 @@ while True:
     query = """
         SELECT zona.*, empresa.razaoSocial FROM empresa 
         JOIN regiao ON idEmpresa = fkRegiaoEmpresa
-        JOIN dataCenter ON idDataCenter = fkRegiaoDataCenter 
+        JOIN datacenter ON idDataCenter = fkRegiaoDataCenter 
         JOIN zona ON fkDataCenter = idDataCenter;
         """
     #Busca todas as zonas e suas empresas
@@ -478,7 +479,220 @@ while True:
 
             # Fazendo o upload apontando o arquivo correto  e colocando a extensão .json no final do destino
             caminho_s3 = f'client/dados-client-{nome_empresa_atual}-analista.json'
-            upload_file(nome_arquivo_json, bucket_name, caminho_s3)
+            upload_file(caminho_local_json, bucket_name, caminho_s3)
+        else:
+            print(f"Não foi encontrado nenhum dado para a empresa: {nome_empresa_atual}")
+
+        ########################################## JSON ESPECIFICA ##########################################
+
+
+
+        df_filtrado['SERVIDOR'] = df_filtrado['SERVIDOR'].astype(str).str.strip().str.upper()
+
+    
+
+
+    query_empresas = "SELECT * FROM empresa"
+    cursor.execute(query_empresas)
+    emrpesas_especifica = cursor.fetchall()
+
+
+
+
+    for empresa in emrpesas_especifica:
+        dados_client_especifica = {}
+        
+        id_empresa = empresa[0]
+        nome_empresa = empresa[1]
+
+
+        query_datacenters = f"SELECT * FROM datacenter JOIN regiao ON fkRegiaoDataCenter = idDatacenter JOIN empresa ON fkRegiaoEmpresa = idEmpresa WHERE fkRegiaoEmpresa = {id_empresa};"
+        cursor.execute(query_datacenters)
+        datacenters = cursor.fetchall()
+
+
+
+
+        if len(datacenters) < 1:
+            print(f"A empresa {nome_empresa} não tem datacenters cadastrados")
+            
+        else:
+            for datacenter in datacenters:
+        
+                id_datacenter = datacenter[0]
+                nome_datacenter = datacenter[1]
+
+                dados_client_especifica[nome_datacenter] = {}
+
+                query_zonas = f"SELECT * FROM zona WHERE fkDataCenter = {id_datacenter};"
+                cursor.execute(query_zonas)
+                zonas = cursor.fetchall()
+
+                if len(zonas) < 1:
+                    print(f"o data center {nome_datacenter} não possui zonas")
+
+                else:
+                    for zona in zonas:
+                        id_zona = zona[0]
+                        nome_zona = zona[1]
+
+                        dados_client_especifica[nome_datacenter][nome_zona] = {}
+
+                        query_servidores = f"SELECT * FROM servidor WHERE fkZona = {id_zona};"
+                        cursor.execute(query_servidores)
+                        servidores = cursor.fetchall()
+
+
+                        if len(servidores) < 1:
+                            print("szona sem servidores")
+
+                        else:
+                            for servidor in servidores:
+
+                                id_servidor = servidor[0]
+                                nome_servidor = servidor[1]      
+
+
+                                df_servidor = df_filtrado[df_filtrado['SERVIDOR'] == nome_servidor.strip().upper()]
+                            
+
+
+                                if df_servidor.empty:
+                #KPIS
+                                    componente_mais_sobreccaregado = []
+                                    processo_com_maior_consumo_geral = []
+                                    processo_com_maior_consumo_geral_ram  = ""
+                                    processo_com_maior_consumo_geral_cpu  = ""    
+                                    uso_de_ram  = 0
+                                    uso_de_cpu = 0 
+                                    uso_disco = 0 
+                                    componente_com_maior_uso_na_semana = []
+                                    ping = 0
+
+
+                                    #GRAFICOS
+                                    grafico_uso_ram = 0
+                                    grafico_uso_cpu = 0
+                                    grafico_uso_disco = 0
+                                    ranking_componenttes = 0
+                                else:
+                                    componente_mais_sobreccaregado = []
+
+                                    print(df_servidor.columns.tolist())
+
+                        
+                                    processo_com_maior_consumo_geral_ram  = df_servidor['PROCESSO1_CPU'].iloc[0]
+                                    processo_com_maior_consumo_geral_cpu  = df_servidor['PROCESSO1_RAM'].iloc[0]    
+                                    uso_de_ram  = round(df_servidor['RAM_PERCENT'].mean(), 2)
+                                    uso_de_cpu = round(df_servidor['CPU'].mean(), 2)
+                                    uso_disco = round(df_servidor['DISCO_PERCENT'].mean(), 2)
+                                    ping = round(df_servidor['LATENCIA'].mean(), 2)
+                                    componente_com_maior_uso_na_semana = []
+
+
+                                    if uso_de_ram > uso_de_cpu and uso_de_ram > uso_disco:
+                                        componente_com_maior_uso_na_semana = "RAM"
+                                        componente_mais_sobreccaregado ="RAM"
+                                    elif uso_de_cpu > uso_de_ram and uso_de_cpu > uso_disco:
+                                        componente_com_maior_uso_na_semana = "CPU"
+                                        componente_mais_sobreccaregado = "CPU"
+                                    elif uso_disco > uso_de_cpu and  uso_disco > uso_de_ram:
+                                        componente_com_maior_uso_na_semana = "DISCO"
+                                        componente_mais_sobreccaregado = "DISCO"
+                                    else:
+                                        componente_com_maior_uso_na_semana = "NDA"
+                                        componente_mais_sobreccaregado = "NDA"
+
+
+
+                                    ranking_componenttes = [["CPU", uso_de_cpu], ["RAM", uso_de_ram], ["DISCO", uso_disco]]
+
+                                    nova_lista_ranking = []
+
+
+                                    
+                                    if componente_mais_sobreccaregado == "RAM":
+                                        if uso_de_cpu > uso_disco:
+                                            ranking_componenttes = [["RAM", uso_de_ram], ["CPU", uso_de_cpu]], ["DISCO", uso_disco]
+                                        else:
+                                            ranking_componenttes = [["RAM", uso_de_ram], ["DISCO", uso_disco]], ["CPU", uso_de_cpu]
+                                    elif componente_mais_sobreccaregado == "CPU":
+                                        if uso_de_ram > uso_disco:
+                                            ranking_componenttes = [["CPU", uso_de_cpu], ["RAM", uso_de_ram]], ["DISCO", uso_disco]
+                                        else:
+                                            ranking_componenttes = [["CPU", uso_de_cpu], ["DISCO", uso_disco]], ["RAM", uso_de_ram]
+                                    elif componente_mais_sobreccaregado == "DISCO":
+                                        if uso_de_ram > uso_de_cpu:
+                                            ranking_componenttes = [["DISCO", uso_disco], ["RAM", uso_de_ram]], ["CPU", uso_de_cpu]
+                                        else:
+                                            ranking_componenttes = [["CPU", uso_de_cpu], ["CPU", uso_de_cpu]], ["RAM", uso_de_ram]                                              
+
+
+
+
+
+
+                                    
+
+                                    
+
+                                    grafico_uso_ram = round(df_servidor['RAM_PERCENT'].mean(), 2)
+                                    grafico_uso_cpu = round(df_servidor['CPU'].mean(), 2)
+                                    grafico_uso_disco = round(df_servidor['DISCO_PERCENT'].mean(), 2)
+
+                                    
+
+
+
+
+
+
+                                dados_client_especifica[nome_datacenter][nome_zona][nome_servidor] = {
+                                    'KPIS': {
+                                        'COMPONENTE_SOBRECARREGADO': componente_mais_sobreccaregado,
+                                        'PROCESSO_COM_MAIOR_CONSUMO_RAM': processo_com_maior_consumo_geral_cpu,
+                                        'PROCESSO_COM_MAOOR_CONSUMO_CPU': processo_com_maior_consumo_geral_ram,
+                                        'USO_CPU': uso_de_cpu,
+                                        'USO_RAM': uso_de_ram,
+                                        'USO_DISCO': uso_disco,
+                                        'COMPONENTE_MAIOR_USO': componente_com_maior_uso_na_semana,
+                                        'LATENCIA': ping
+                                    },
+
+                                    'GRAFICOS': {
+                                        'USO_CPU': grafico_uso_cpu,
+                                        'USO_RAM': grafico_uso_ram,
+                                        'USO_DISCO': grafico_uso_disco,
+                                        'LATENCIA': ping,
+                                        'RANKING_COMPONENTES': ranking_componenttes
+                                     },
+                                }
+                        
+                        
+
+                
+
+        
+
+        
+
+
+        if dados_client_especifica:
+            hora_envio = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S') 
+
+            pasta_destino_json = 'dados_clientes_json'
+            os.makedirs(pasta_destino_json, exist_ok=True)
+            nome_arquivo_json = f"dados-client-{nome_empresa}-especifica.json"
+            caminho_local_json = os.path.join(pasta_destino_json, nome_arquivo_json)
+
+            with open(caminho_local_json, 'w', encoding='utf-8') as f:
+                json.dump(dados_client_especifica, f, indent=4, ensure_ascii=False, default=json_serial)
+
+            print(Fore.GREEN + f"Arquivo {nome_arquivo_json} criado com sucesso!"+ Style.RESET_ALL)
+
+            # Fazendo o upload apontando o arquivo correto  e colocando a extensão .json no final do destino
+            caminho_s3 = f'client/dados-client-{nome_empresa_atual}-especifica.json'
+            upload_file(caminho_local_json, bucket_name, caminho_s3)
         else:
             print(f"Não foi encontrado nenhum dado para a empresa: {nome_empresa_atual}")
             
@@ -487,11 +701,11 @@ while True:
         ########################################## JSON GESTOR ##########################################
 
 
-        ########################################## JSON ESPECIFICA ##########################################
+
 
 
     print(Fore.WHITE + "Processamento concluído. Aguardando 5 minutos para o próximo ciclo..." + Style.RESET_ALL)
-    time.sleep(150)
+    time.sleep(120)
 
 
 
