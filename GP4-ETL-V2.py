@@ -352,7 +352,7 @@ while True:
             #Em seguida faz uma media das colunas que somente são numericas, ignorando todas as colunas de texto
             #OBS: O indece dessa lista passa a ser os valores de SERVIDOR
 
-            criticos = df_media_servers[(df_media_servers['CPU'] > 5) | (df_media_servers['RAM_PERCENT'] > 5)]
+            criticos = df_media_servers[(df_media_servers['CPU'] > 90) | (df_media_servers['RAM_PERCENT'] > 85)]
             #Aqui é complicado, pegamos os servidores criticos com a CPU > 80 e a RAM PERCENT > 90
             if criticos.empty:
                 listaServersCriticos = 'Nenhum servidor critico encontrado!'
