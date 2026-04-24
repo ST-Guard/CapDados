@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 
 arquivo_csv = "dados-brutos_maquina.csv"
-bucket_name = 'smartdatabucket1'
+bucket_name = 'bucket-22-04-26'
 
 #STE12345          
 #SERVIDOR-DC01-WEB-05
@@ -34,7 +34,7 @@ print("""\033[33m
 
 
 
-bucket_name = 'smartdatabucket1'
+bucket_name = 'bucket-22-04-26'
 
 
 load_dotenv()
@@ -69,6 +69,7 @@ def upload_file(file_name, bucket, object_name=None):
 
     try:
         response = session.upload_file(file_name, bucket, object_name)
+        print("enviado para o S3 com sucesso")
     except ValueError as e:
         print(f"Erro ao enviar para o S3: {e}")
     return True
@@ -111,7 +112,7 @@ else:
     if len(servidor) == 0:
         print("SERVIDOR NÃO É VALIDO")
     else:
-        print("SERVIDOR CORRETO INICIANDO A CAPTAÇÃO DOS DADOS")
+        print("INICIANDO A CAPTAÇÃO DOS DADOS")
         arquivo_csv = f"dados-brutos-{servidor[0][1]}.csv"
 
         
