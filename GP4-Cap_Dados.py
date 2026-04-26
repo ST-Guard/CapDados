@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 
 arquivo_csv = "dados-brutos_maquina.csv"
-bucket_name = 'bucket-22-04-26'
+bucket_name = 'smartdatabucket1'
 
 #STE12345          
 #SERVIDOR-DC01-WEB-05
@@ -33,8 +33,6 @@ print("""\033[33m
 \033[m""")
 
 
-
-bucket_name = 'bucket-22-04-26'
 
 
 load_dotenv()
