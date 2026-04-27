@@ -6,6 +6,7 @@ import boto3
 import os
 import mysql.connector
 import json
+import numpy as np
 from dotenv import load_dotenv
 from colorama import Fore, Style, init
 #pip install colorama
@@ -215,6 +216,61 @@ while True:
         hora_envio = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S') 
         upload_file('dados-tratados.csv', bucket_name, f'treated/dados_tratados.csv')
         print(Fore.GREEN +"Dados tratados e enviados com sucesso para a AWS!"+ Style.RESET_ALL)
+
+
+
+    ###################### TRATANDO OS DADOS DOS ULTIMOS 7 DIAS
+    limite_tempo7 = pd.Timestamp.now() - timedelta(days=7)
+    df_filtrado7D = dados_brutos[dados_brutos['DATA_HORA'] >= limite_tempo7].copy()
+
+    if df_filtrado7D.empty:
+        print("Nenhum dado encontrado nos ultimos 7 DIAS")
+    else:
+        print(f"Encontradas {len(df_filtrado)} linhas para processar.")
+
+        df_filtrado7D['RAM_TOTAL_GB'] = (df_filtrado7D['RAM_TOTAL'] / (1024 ** 3)).round(2)
+        df_filtrado7D['RAM_USADA_GB'] = (df_filtrado7D['RAM_USADA'] / (1024 ** 3)).round(2)
+        df_filtrado7D['DISCO_TOTAL_GB'] = (df_filtrado7D['DISCO_TOTAL'] / (1024 ** 3)).round(2)
+        df_filtrado7D['DISCO_USADO_GB'] = (df_filtrado7D['DISCO_USADO'] / (1024 ** 3)).round(2)
+        df_filtrado7D['LATENCIA'] = df_filtrado7D['LATENCIA'].round(2)
+        df_filtrado7D['PROCESSO1_RAM_GB'] = (df_filtrado7D['PORCENTAGEM_PROCESSO1_RAM'] / (1024 ** 3)).round(2)
+        df_filtrado7D['PROCESSO2_RAM_GB'] = (df_filtrado7D['PORCENTAGEM_PROCESSO2_RAM'] / (1024 ** 3)).round(2)
+        df_filtrado7D['PROCESSO3_RAM_GB'] = (df_filtrado7D['PORCENTAGEM_PROCESSO3_RAM'] / (1024 ** 3)).round(2)
+        df_filtrado7D['PROCESSO1_RAM_PERC'] = (df_filtrado7D['PROCESSO1_RAM_GB'] * 100) / df_filtrado7D['RAM_TOTAL_GB']
+        df_filtrado7D['PROCESSO2_RAM_PERC'] = (df_filtrado7D['PROCESSO2_RAM_GB'] * 100) / df_filtrado7D['RAM_TOTAL_GB']
+        df_filtrado7D['PROCESSO3_RAM_PERC'] = (df_filtrado7D['PROCESSO3_RAM_GB'] * 100) / df_filtrado7D['RAM_TOTAL_GB']
+
+        #TEMPOOOOO
+        df_filtrado7D['BOOTTIME_DT'] = pd.to_datetime(df_filtrado7D['BOOTTIME'], unit='s')
+        df_filtrado7D['UPTIME'] = df_filtrado7D['DATA_HORA'] - df_filtrado7D['BOOTTIME_DT']
+        df_filtrado7D['HORA_TRATAMENTO'] = pd.Timestamp.now()
+
+    ###################### TRATANDO OS DADOS DOS ULTIMOS 30 DIAS
+
+    limite_tempo30 = pd.Timestamp.now() - timedelta(days=30)
+    df_filtrado30 = dados_brutos[dados_brutos['DATA_HORA'] >= limite_tempo7].copy()
+
+    if df_filtrado7D.empty:
+        print("Nenhum dado encontrado nos ultimos 30 DIAS")
+    else:
+        print(f"Encontradas {len(df_filtrado)} linhas para processar.")
+
+        df_filtrado30['RAM_TOTAL_GB'] = (df_filtrado30['RAM_TOTAL'] / (1024 ** 3)).round(2)
+        df_filtrado30['RAM_USADA_GB'] = (df_filtrado30['RAM_USADA'] / (1024 ** 3)).round(2)
+        df_filtrado30['DISCO_TOTAL_GB'] = (df_filtrado30['DISCO_TOTAL'] / (1024 ** 3)).round(2)
+        df_filtrado30['DISCO_USADO_GB'] = (df_filtrado30['DISCO_USADO'] / (1024 ** 3)).round(2)
+        df_filtrado30['LATENCIA'] = df_filtrado30['LATENCIA'].round(2)
+        df_filtrado30['PROCESSO1_RAM_GB'] = (df_filtrado30['PORCENTAGEM_PROCESSO1_RAM'] / (1024 ** 3)).round(2)
+        df_filtrado30['PROCESSO2_RAM_GB'] = (df_filtrado30['PORCENTAGEM_PROCESSO2_RAM'] / (1024 ** 3)).round(2)
+        df_filtrado30['PROCESSO3_RAM_GB'] = (df_filtrado30['PORCENTAGEM_PROCESSO3_RAM'] / (1024 ** 3)).round(2)
+        df_filtrado30['PROCESSO1_RAM_PERC'] = (df_filtrado30['PROCESSO1_RAM_GB'] * 100) / df_filtrado30['RAM_TOTAL_GB']
+        df_filtrado30['PROCESSO2_RAM_PERC'] = (df_filtrado30['PROCESSO2_RAM_GB'] * 100) / df_filtrado30['RAM_TOTAL_GB']
+        df_filtrado30['PROCESSO3_RAM_PERC'] = (df_filtrado30['PROCESSO3_RAM_GB'] * 100) / df_filtrado30['RAM_TOTAL_GB']
+
+        #TEMPOOOOO
+        df_filtrado30['BOOTTIME_DT'] = pd.to_datetime(df_filtrado30['BOOTTIME'], unit='s')
+        df_filtrado30['UPTIME'] = df_filtrado30['DATA_HORA'] - df_filtrado30['BOOTTIME_DT']
+        df_filtrado30['HORA_TRATAMENTO'] = pd.Timestamp.now()
 
 
 
@@ -699,6 +755,197 @@ while True:
         
 
         ########################################## JSON GESTOR ##########################################
+
+    query_empresas = "SELECT * FROM empresa"
+    cursor.execute(query_empresas)
+    emrpesas_gestor = cursor.fetchall()
+
+    for empresa_gestor in emrpesas_gestor:
+
+        dados_client_gestor = {}
+        
+        id_empresa = empresa_gestor[0]
+        nome_empresa = empresa_gestor[1]
+
+
+        query_datacenters = f"SELECT * FROM datacenter JOIN regiao ON fkRegiaoDataCenter = idDatacenter JOIN empresa ON fkRegiaoEmpresa = idEmpresa WHERE fkRegiaoEmpresa = {id_empresa};"
+        cursor.execute(query_datacenters)
+        datacenters_gestor  = cursor.fetchall()
+
+
+        for datacenter in datacenters_gestor:
+    
+
+
+            nome_datacenter = datacenter[1]
+
+            id_datacenter = datacenter[0]
+
+            df_datacenter = df_filtrado[df_filtrado['DATACENTER'] == nome_datacenter.strip().upper()]
+            df_datacenter30 = df_filtrado30[df_filtrado30['DATACENTER'] == nome_datacenter.strip().upper()]
+            df_datacenter7D = df_filtrado7D[df_filtrado7D['DATACENTER'] == nome_datacenter.strip().upper()]
+
+            query_servidores_totais = f"SELECT COUNT(idServidor) FROM servidor JOIN  zona ON fkZona = idZona JOIN datacenter ON fkDataCenter = idDataCenter WHERE  fkDataCenter = {id_datacenter};"
+            cursor.execute(query_servidores_totais)
+            servidores_totais = cursor.fetchall()
+
+
+            query_servidores_ativos = f"""SELECT COUNT(idServidor) FROM servidor JOIN  zona ON fkZona = idZona JOIN datacenter ON fkDataCenter = idDataCenter WHERE estado = "Ativo" and fkDataCenter = {id_datacenter};"""
+            cursor.execute(query_servidores_ativos)
+            servidores_ativos = cursor.fetchall()
+
+
+    
+
+
+            if df_datacenter.empty:
+
+                processo_maior_consumo = "nao possui"
+                processo_componente = "nao tem"
+
+                cpu_p99 = 0
+                ram_p99 = 0
+                tendencia_ram = 0
+                tendencia_cpu = 0
+                disco_p99 = 0
+                latencia_p99 = 0
+                tendencia_disco =0
+                tendencia_latencia = 0
+            else:
+
+            
+
+                processo_maior_consumo = [df_datacenter['PROCESSO1_CPU'].iloc[-1], df_datacenter['PROCESSO1_RAM'].iloc[-1]]
+            
+
+
+                # para o momento atual
+                cpu_p99 = round(df_datacenter['CPU'].quantile(0.99),2 )
+                ram_p99 = round(df_datacenter['RAM_PERCENT'].quantile(0.99),  2)
+                tendencia_ram = round((ram_p99 + ( float(np.polyfit(np.arange(len(df_datacenter['RAM_PERCENT'])), df_datacenter['RAM_PERCENT'], 1)[0])  * 5 )), 2)
+                tendencia_cpu = round((cpu_p99 + ( float(np.polyfit(np.arange(len(df_datacenter['CPU'])), df_datacenter['CPU'], 1)[0])  * 5 )), 2)
+                disco_p99 = round(df_datacenter['DISCO_PERCENT'].quantile(0.99), 2)
+                latencia_p99 = round(df_datacenter['LATENCIA'].quantile(0.99), 2)
+                tendencia_disco = round((disco_p99 + ( float(np.polyfit(np.arange(len(df_datacenter['DISCO_PERCENT'])), df_datacenter['DISCO_PERCENT'], 1)[0])  * 5 )), 2)
+                tendencia_latencia = round((latencia_p99 + ( float(np.polyfit(np.arange(len(df_datacenter['LATENCIA'])), df_datacenter['LATENCIA'], 1)[0])  * 5 )), 2)
+
+            if df_datacenter7D.empty:
+
+
+                # para os ultimos 7 dias
+
+
+                cpu_p99_7D = 0
+                ram_p99_7D = 0
+                tendencia_ram_7D = 0
+                tendencia_cpu_7D = 0
+                disco_p99_7D = 0
+                latencia_p99_7D = 0
+                tendencia_disco_7D =0
+                tendencia_latencia_7D = 0
+                
+            else:
+
+                cpu_p99_7D = round(df_datacenter7D['CPU'].quantile(0.99),2 )
+                ram_p99_7D = round(df_datacenter7D['RAM_PERCENT'].quantile(0.99),  2)
+                tendencia_ram_7D = round((ram_p99 + ( float(np.polyfit(np.arange(len(df_datacenter7D['RAM_PERCENT'])), df_datacenter7D['RAM_PERCENT'], 1)[0])  * 60.4800)), 2)
+                tendencia_cpu_7D = round((cpu_p99 + ( float(np.polyfit(np.arange(len(df_datacenter7D['CPU'])), df_datacenter7D['CPU'], 1)[0])  * 60.4800)), 2)
+                disco_p99_7D = round(df_datacenter7D['DISCO_PERCENT'].quantile(0.99), 2)
+                latencia_p99_7D =  round(df_datacenter7D['LATENCIA'].quantile(0.99), 2)
+                tendencia_disco_7D =round((disco_p99 + ( float(np.polyfit(np.arange(len(df_datacenter7D['DISCO_PERCENT'])), df_datacenter7D['DISCO_PERCENT'], 1)[0])  * 60.4800 )), 2)
+                tendencia_latencia_7D =  round((latencia_p99 + ( float(np.polyfit(np.arange(len(df_datacenter7D['LATENCIA'])), df_datacenter7D['LATENCIA'], 1)[0])  * 60.4800 )), 2)
+
+
+            if df_datacenter30.empty:
+                cpu_p99_30D = 0
+                ram_p99_30D = 0
+                tendencia_ram_30D = 0
+                tendencia_cpu_30D = 0
+                disco_p99_30D = 0
+                latencia_p99_30D = 0
+                tendencia_disco_30D =0
+                tendencia_latencia_30D = 0
+
+                # para os ultimos 30 dias
+
+            else:
+                cpu_p99_30D = round(df_datacenter30['CPU'].quantile(0.99),2 )
+                ram_p99_30D =  round(df_datacenter30['RAM_PERCENT'].quantile(0.99),  2)
+                tendencia_ram_30D =  round((ram_p99 + ( float(np.polyfit(np.arange(len(df_datacenter30['RAM_PERCENT'])), df_datacenter30['RAM_PERCENT'], 1)[0])  * 2.592000)), 2)
+                tendencia_cpu_30D = round((cpu_p99 + ( float(np.polyfit(np.arange(len(df_datacenter30['CPU'])), df_datacenter30['CPU'], 1)[0])  * 2.592000)), 2)
+                disco_p99_30D = round(df_datacenter30['DISCO_PERCENT'].quantile(0.99), 2)
+                latencia_p99_30D =  round(df_datacenter30['LATENCIA'].quantile(0.99), 2)
+                tendencia_disco_30D =round((disco_p99 + ( float(np.polyfit(np.arange(len(df_datacenter30['DISCO_PERCENT'])), df_datacenter30['DISCO_PERCENT'], 1)[0])  * 2.592000)), 2)
+                tendencia_latencia_30D = round((latencia_p99 + ( float(np.polyfit(np.arange(len(df_datacenter30['LATENCIA'])), df_datacenter30['LATENCIA'], 1)[0])  * 2.592000)), 2)
+
+
+
+
+            dados_client_gestor[nome_datacenter] = {
+                "KPI": {
+                    "SERVIDORES_ATIVOS": servidores_ativos[0][0],
+                    "SERVIDORES_TOTAIS": servidores_totais[0][0], 
+                    "PROCESSO_MAIOR_CONSUMO": processo_maior_consumo,
+
+                    
+                },
+                "GRAFICOS": {
+                    
+                    "DADOS_ATUAIS": {
+                    "CPU_P99": cpu_p99,
+                    "RAM_P99": ram_p99,
+                    "TENDENCIA_RAM": tendencia_ram,
+                    "TENDENCIA_CPU": tendencia_cpu,
+                    "DISCO_P99": disco_p99,
+                    "LATENCIA_P99": latencia_p99,
+                    "TENDENCIA_DISCO": tendencia_disco,
+                    "TENDENCIA_LATENCIA": tendencia_latencia },
+
+
+                    "DADOS_7_DIAS": {
+                    "CPU_P99": cpu_p99_7D,
+                    "RAM_P99": ram_p99_7D,
+                    "TENDENCIA_RAM": tendencia_ram_7D,
+                    "TENDENCIA_CPU": tendencia_cpu_7D,
+                    "DISCO_P99": disco_p99_7D,
+                    "LATENCIA_P99": latencia_p99_7D,
+                    "TENDENCIA_DISCO": tendencia_disco_7D,
+                    "TENDENCIA_LATENCIA": tendencia_latencia_7D },
+
+                    "DADOS_30_DIAS": {
+                    "CPU_P99": cpu_p99_30D,
+                    "RAM_P99": ram_p99_30D,
+                    "TENDENCIA_RAM": tendencia_ram_30D,
+                    "TENDENCIA_CPU": tendencia_cpu_30D,
+                    "DISCO_P99": disco_p99_30D,
+                    "LATENCIA_P99": latencia_p99_30D,
+                    "TENDENCIA_DISCO": tendencia_disco_30D,
+                    "TENDENCIA_LATENCIA": tendencia_latencia_30D },
+
+
+                }
+
+        }
+
+    
+    if dados_client_especifica:
+            hora_envio = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S') 
+
+            pasta_destino_json = 'dados_clientes_json'
+            os.makedirs(pasta_destino_json, exist_ok=True)
+            nome_arquivo_json = f"dados-client-{nome_empresa}-gestor.json"
+            caminho_local_json = os.path.join(pasta_destino_json, nome_arquivo_json)
+
+            with open(caminho_local_json, 'w', encoding='utf-8') as f:
+                json.dump(dados_client_gestor, f, indent=4, ensure_ascii=False, default=json_serial)
+
+            print(Fore.GREEN + f"Arquivo {nome_arquivo_json} criado com sucesso!"+ Style.RESET_ALL)
+
+            # Fazendo o upload apontando o arquivo correto  e colocando a extensão .json no final do destino
+            caminho_s3 = f'client/dados-client-{nome_empresa_atual}-gestor.json'
+            upload_file(caminho_local_json, bucket_name, caminho_s3)
+    else:
+            print(f"Não foi encontrado nenhum dado para a empresa: {nome_empresa_atual}")
 
 
 

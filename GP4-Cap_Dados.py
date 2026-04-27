@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 
 arquivo_csv = "dados-brutos_maquina.csv"
-bucket_name = 'smartdatabucket1'
+bucket_name = 'bucket-22-04-26'
 
 #STE12345          
 #SERVIDOR-DC01-WEB-05
