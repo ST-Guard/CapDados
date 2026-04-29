@@ -20,7 +20,7 @@ def get_fator_horario_suave(hora_decimal):
     return 0.5
 
 def main():
-    print("=== GERADOR DE DADOS DE TELEMETRIA (ORGÂNICO) ===")
+    print("=== GERADOR DE DADOS (ORGÂNICO) ===")
     
     try:
         dias_simulacao = int(input("Por quantos dias para trás você deseja gerar os dados? "))
@@ -36,10 +36,10 @@ def main():
     
     
     empresa = "Steam"
-    regiao = "BR-South"
-    datacenter = "DC-SP1"
-    zona = "Zone-A"
-    servidor = "SRV-PROD-01"
+    regiao = "Steam Sp"
+    datacenter = "ST-SP-01"
+    zona = "Zona A"
+    servidor = "SERVIDOR-DC01-WEB-05"
     ram_total = 64.0
     disco_total = 2000.0
     qtd_nucleos = 16

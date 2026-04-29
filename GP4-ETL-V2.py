@@ -29,11 +29,25 @@ print("""\033[33m
                                                                                               
 \033[m""")
 
-#ENV
+
+#####
+#####
+#####
+#####
+#####
+##### PARTE 1 - CONFIGURAÇÕES DE USUARIO/ARQUIVOS
+#####
+#####
+#####
+#####
+#####
+
+
+# RODANDO O ARQUIVO .ENV
 load_dotenv()
 
 
-#################################################### Acesso ao banco de dados
+# ACESSO AO BANCO DE DADOS
 banco_host = os.getenv('DB_HOST')
 banco_user = os.getenv('DB_USER')
 banco_senha = os.getenv('DB_PASSWORD')
@@ -56,8 +70,8 @@ cursor.execute(query)
 empresas = cursor.fetchall()
 
 
-######################################### Acesso ao bucket
 
+# ACESSO AO BUCKET
 chave_acesso = os.getenv('AWS_ACCESS_KEY_ID')
 chave_secreta = os.getenv('AWS_SECRET_ACCESS_KEY')
 token_sessao = os.getenv('AWS_SESSION_TOKEN')
@@ -69,6 +83,8 @@ s3_cliente = boto3.client(
     )
 
 
+
+# DEFININDO A FUNÇÃO DE CONEXÃO DO BOTO3
 def upload_file(file_name, bucket, object_name=None):
     # If S3 object_name was not specified, use file_name
     if object_name is None:
@@ -82,12 +98,10 @@ def upload_file(file_name, bucket, object_name=None):
     return True
 
 
-# caminho_csv = 'dados-brutos-instalado.csv'
-# dados_brutos = pd.read_csv(caminho_csv, sep=';')
 
 
-###################### JSON
 
+# CONVERTE OS TIPOS DE NUMEROS DO NUMPY, PARA QUE ELES POSSAM SER ENVIADOS AO JSON
 def json_serial(obj):
     import numpy as np
     if isinstance(obj, (np.float64, np.float32)):
@@ -96,56 +110,82 @@ def json_serial(obj):
 
 
 
+
+
+# INICIANDO O ETL NA CAMADA SILVER
 while True:
     print(Fore.WHITE + "\n ---------- INICIANDO CICLO DE PROCESSAMENTO ETL (A cada 5 minutos) ----------" + Style.RESET_ALL)
     print()
 
 
-    ################################################################ Tratando os dados para o SILVER ################################################################
+#####
+#####
+#####
+#####
+#####   
+##### PARTE 2 - EXTRAÇÃO
+#####
+#####
+#####
+#####
 
 
-    ####INSTALANDO TODOS OS DADOS DO RAW
-    
-    bucket_name = 'bucket-22-04-26'
+   
+   # DEFININDO O NOME DO BUCKET E DA PASTA ONDE OS ARQUIVOS DO RAW  VÃO SER EXTRAIDOS 
+    bucket_name = 's3-smart-data-teste'
     prefixo_pasta = 'raw/'
-    pasta_local_destino = 'dados_brutos_ram'
+    pasta_local_destino = 'dados_brutos_raw'
     
+
+    # TENTANDO LISTAR TODOS OS OS OBJETOS DO RAW
     try:
-        #LISTANDO TODOS OS ARQUIVOS DO RAAAW
+        
         resposta_s3 = s3_cliente.list_objects_v2(Bucket=bucket_name, Prefix=prefixo_pasta)
     except Exception as e:
         print(f"Erro ao acessar o bucket S3: {e}")
         conexao.close()
-        time.sleep(120)
         continue
 
-    # Se a pasta não existir ou estiver vazia
+    # VERIFICANDO SE EXISTEM ARQUIVOS NA PASTA RAW
     if 'Contents' not in resposta_s3:
         print("Nenhum arquivo encontrado na pasta raw. Esperando proximo ciclo")
         conexao.close()
-        time.sleep(120)
         continue
+    
 
+    # CRIANDO A PASTA ONDE OS ARQUIVOS DA RAW SERÃO INSTALADOS
     os.makedirs(pasta_local_destino, exist_ok=True)
+
+    # DEFININDO A LISTA ONDE SERÃO JUNTADOS EM TODOS OS DATAFRAMES
     lista_dataframes = [] 
     
-    print("\033[38;5;130m========= BRONZE ============\033[0m")
+    print("\033[38;5;130m============================== CAMADA RAW ============================== \033[0m")
+
+
+    # PEGANDO A LISTA DO LIST OBJECTS E ACESSANDO UMA POR UMA
     for resposta in resposta_s3['Contents']:
-        caminho_s3 = resposta['Key'] # Ex: 'raw/Steam_SP_ZonaA_AB043.csv'
+
+        # ACESSANDO O ID DO ARQUIVO EM ESPECIFICO
+        caminho_s3 = resposta['Key'] 
         
         # O S3 as vezes retorna a propria pasta vazia como um respostaeto. Só ignora
         if caminho_s3.endswith('/') or resposta['Size'] == 0:
             continue
         
+
+        # CRIA UM NOME TEMPORARIO PARA O ARQUIVO
         nome_puro = os.path.basename(caminho_s3)
-        # Cria um nome local temporario para o arquivo baixado
+        # CRIA UM NOME LOCAL TEMPORARIO PARA O ARQUIVO
         nome_arquivo_local = os.path.join(pasta_local_destino, nome_puro)
-        #Vai ficar tipo> dados_brutos/temp_Steam_SP_ZonaA_AB043.csv
-        #Sim, é para criar uma pasta, saco?
+        
+
+        # TENTANDO FAZER O DOWNLOAD DO ARQUIVO E LENDO 
         try:
             print(f"Baixando arquivo: {caminho_s3} ...")
             s3_cliente.download_file(bucket_name, caminho_s3, nome_arquivo_local)
             
+
+            # LENDO OS ARQUIVOS E COLOCANDO NA LISTA DOS DATAFRAMES
             df_temp = pd.read_csv(nome_arquivo_local, sep=';')
             lista_dataframes.append(df_temp)
             
@@ -161,18 +201,34 @@ while True:
         time.sleep(120)
         continue
 
-    # Junta as dezenas de CSVs de varias maquinas em uma tabela UNICA gigante (dados_brutos)
+    # JUNTA TOODS OS DATAFRAMES EM APENAS 1 SÓ PARA A INICIAÇÃO DA CAMADA SILVER
     dados_brutos = pd.concat(lista_dataframes, ignore_index=True)
     print(Fore.GREEN + f"Sucesso! {len(lista_dataframes)} arquivos combinados. Total de {len(dados_brutos)} linhas." + Style.RESET_ALL)
 
 
+#####
+#####
+#####
+#####
+#####
+# PARTE 3 INICIO DA CAMADA SILVER
+#####
+#####
+#####
+#####
+#####
 
-    ######### A PARTIR DAQUI, É O TRATAMENTE DAS COLUNAS (DEPOIS DE UNIFICAR TODOS OS CSVS)
-    print("\033[37m========= SILVER ============\033[0m")
-    dados_brutos['DATA_HORA'] = pd.to_datetime(dados_brutos['DATA_HORA'], format="%Y-%m-%d %H:%M:%S.%f", errors='coerce')
+    print("\033[37m============================== CAMADA TRUSTED ==============================  \033[0m")
+
+    # TRANSFORMANDO A DATA DOS DADOS BRUTOS DE STRING PARA TIPO DATA
+    dados_brutos['DATA_HORA'] = pd.to_datetime(dados_brutos['DATA_HORA'], format="mixed", errors='coerce')
+
+    # DEFININDO O LIMITE DE TEMPO
     limite_tempo = pd.Timestamp.now() - timedelta(minutes=5)
     df_filtrado = dados_brutos[dados_brutos['DATA_HORA'] >= limite_tempo].copy()
 
+
+    #  PEGANDO OS DADOS FILTRADOS QUE ESTÃO NO LIMITE DE TEMPO E TRANSFORMANDO ELES EM DADOS ESPECIFICOS
     if df_filtrado.empty:
         print("Nenhum dado encontrado nos ultimos 5 minutos")
     else:
@@ -219,8 +275,40 @@ while True:
 
 
 
-    ###################### TRATANDO OS DADOS DOS ULTIMOS 7 DIAS
+    # TRATANDO OS DADOS DO DIA ANTERIOR
+
+
+    hoje = pd.Timestamp.now().normalize()
+    ontem = hoje - timedelta(days=1)
+    # o normalize serve para colocar sempre a data em 00:00:00
+    df_filtrado1D = dados_brutos[(dados_brutos['DATA_HORA'] >= ontem) & (dados_brutos['DATA_HORA'] < hoje)].copy()
+
+    if df_filtrado1D.empty:
+        print("Nas 24 horas anteriores")
+    else:
+        print(f"Encontradas {len(df_filtrado)} linhas para processar.")
+
+        df_filtrado1D['RAM_TOTAL_GB'] = (df_filtrado1D['RAM_TOTAL'] / (1024 ** 3)).round(2)
+        df_filtrado1D['RAM_USADA_GB'] = (df_filtrado1D['RAM_USADA'] / (1024 ** 3)).round(2)
+        df_filtrado1D['DISCO_TOTAL_GB'] = (df_filtrado1D['DISCO_TOTAL'] / (1024 ** 3)).round(2)
+        df_filtrado1D['DISCO_USADO_GB'] = (df_filtrado1D['DISCO_USADO'] / (1024 ** 3)).round(2)
+        df_filtrado1D['LATENCIA'] = df_filtrado1D['LATENCIA'].round(2)
+        df_filtrado1D['PROCESSO1_RAM_GB'] = (df_filtrado1D['PORCENTAGEM_PROCESSO1_RAM'] / (1024 ** 3)).round(2)
+        df_filtrado1D['PROCESSO2_RAM_GB'] = (df_filtrado1D['PORCENTAGEM_PROCESSO2_RAM'] / (1024 ** 3)).round(2)
+        df_filtrado1D['PROCESSO3_RAM_GB'] = (df_filtrado1D['PORCENTAGEM_PROCESSO3_RAM'] / (1024 ** 3)).round(2)
+        df_filtrado1D['PROCESSO1_RAM_PERC'] = (df_filtrado1D['PROCESSO1_RAM_GB'] * 100) / df_filtrado1D['RAM_TOTAL_GB']
+        df_filtrado1D['PROCESSO2_RAM_PERC'] = (df_filtrado1D['PROCESSO2_RAM_GB'] * 100) / df_filtrado1D['RAM_TOTAL_GB']
+        df_filtrado1D['PROCESSO3_RAM_PERC'] = (df_filtrado1D['PROCESSO3_RAM_GB'] * 100) / df_filtrado1D['RAM_TOTAL_GB']
+
+        #TEMPOOOOO
+        df_filtrado1D['BOOTTIME_DT'] = pd.to_datetime(df_filtrado1D['BOOTTIME'], unit='s')
+        df_filtrado1D['UPTIME'] = df_filtrado1D['DATA_HORA'] - df_filtrado1D['BOOTTIME_DT']
+        df_filtrado1D['HORA_TRATAMENTO'] = pd.Timestamp.now()
+
+
+    # TRATANDO OS DADOS DA SEMANA ANTERIROR
     limite_tempo7 = pd.Timestamp.now() - timedelta(days=7)
+
     df_filtrado7D = dados_brutos[dados_brutos['DATA_HORA'] >= limite_tempo7].copy()
 
     if df_filtrado7D.empty:
@@ -245,47 +333,60 @@ while True:
         df_filtrado7D['UPTIME'] = df_filtrado7D['DATA_HORA'] - df_filtrado7D['BOOTTIME_DT']
         df_filtrado7D['HORA_TRATAMENTO'] = pd.Timestamp.now()
 
-    ###################### TRATANDO OS DADOS DOS ULTIMOS 30 DIAS
+    
 
-    limite_tempo30 = pd.Timestamp.now() - timedelta(days=30)
-    df_filtrado30 = dados_brutos[dados_brutos['DATA_HORA'] >= limite_tempo7].copy()
+
+
+
+    # TRATANDO OS DADOS DA SEMANA ANTERIROR
+    limite_tempo7 = pd.Timestamp.now() - timedelta(days=14)
+    
+    semana_anterior = limite_tempo7 + timedelta(days=7)
+    df_filtrado7DA = dados_brutos[(dados_brutos['DATA_HORA'] >= limite_tempo7) & (dados_brutos['DATA_HORA'] <= semana_anterior)].copy()
 
     if df_filtrado7D.empty:
-        print("Nenhum dado encontrado nos ultimos 30 DIAS")
+        print("Nenhum dado encontrado nos ultimos 7 DIAS")
     else:
         print(f"Encontradas {len(df_filtrado)} linhas para processar.")
 
-        df_filtrado30['RAM_TOTAL_GB'] = (df_filtrado30['RAM_TOTAL'] / (1024 ** 3)).round(2)
-        df_filtrado30['RAM_USADA_GB'] = (df_filtrado30['RAM_USADA'] / (1024 ** 3)).round(2)
-        df_filtrado30['DISCO_TOTAL_GB'] = (df_filtrado30['DISCO_TOTAL'] / (1024 ** 3)).round(2)
-        df_filtrado30['DISCO_USADO_GB'] = (df_filtrado30['DISCO_USADO'] / (1024 ** 3)).round(2)
-        df_filtrado30['LATENCIA'] = df_filtrado30['LATENCIA'].round(2)
-        df_filtrado30['PROCESSO1_RAM_GB'] = (df_filtrado30['PORCENTAGEM_PROCESSO1_RAM'] / (1024 ** 3)).round(2)
-        df_filtrado30['PROCESSO2_RAM_GB'] = (df_filtrado30['PORCENTAGEM_PROCESSO2_RAM'] / (1024 ** 3)).round(2)
-        df_filtrado30['PROCESSO3_RAM_GB'] = (df_filtrado30['PORCENTAGEM_PROCESSO3_RAM'] / (1024 ** 3)).round(2)
-        df_filtrado30['PROCESSO1_RAM_PERC'] = (df_filtrado30['PROCESSO1_RAM_GB'] * 100) / df_filtrado30['RAM_TOTAL_GB']
-        df_filtrado30['PROCESSO2_RAM_PERC'] = (df_filtrado30['PROCESSO2_RAM_GB'] * 100) / df_filtrado30['RAM_TOTAL_GB']
-        df_filtrado30['PROCESSO3_RAM_PERC'] = (df_filtrado30['PROCESSO3_RAM_GB'] * 100) / df_filtrado30['RAM_TOTAL_GB']
+        df_filtrado7DA['RAM_TOTAL_GB'] = (df_filtrado7DA['RAM_TOTAL'] / (1024 ** 3)).round(2)
+        df_filtrado7DA['RAM_USADA_GB'] = (df_filtrado7DA['RAM_USADA'] / (1024 ** 3)).round(2)
+        df_filtrado7DA['DISCO_TOTAL_GB'] = (df_filtrado7DA['DISCO_TOTAL'] / (1024 ** 3)).round(2)
+        df_filtrado7DA['DISCO_USADO_GB'] = (df_filtrado7DA['DISCO_USADO'] / (1024 ** 3)).round(2)
+        df_filtrado7DA['LATENCIA'] = df_filtrado7DA['LATENCIA'].round(2)
+        df_filtrado7DA['PROCESSO1_RAM_GB'] = (df_filtrado7DA['PORCENTAGEM_PROCESSO1_RAM'] / (1024 ** 3)).round(2)
+        df_filtrado7DA['PROCESSO2_RAM_GB'] = (df_filtrado7DA['PORCENTAGEM_PROCESSO2_RAM'] / (1024 ** 3)).round(2)
+        df_filtrado7DA['PROCESSO3_RAM_GB'] = (df_filtrado7DA['PORCENTAGEM_PROCESSO3_RAM'] / (1024 ** 3)).round(2)
+        df_filtrado7DA['PROCESSO1_RAM_PERC'] = (df_filtrado7DA['PROCESSO1_RAM_GB'] * 100) / df_filtrado7DA['RAM_TOTAL_GB']
+        df_filtrado7DA['PROCESSO2_RAM_PERC'] = (df_filtrado7DA['PROCESSO2_RAM_GB'] * 100) / df_filtrado7DA['RAM_TOTAL_GB']
+        df_filtrado7DA['PROCESSO3_RAM_PERC'] = (df_filtrado7DA['PROCESSO3_RAM_GB'] * 100) / df_filtrado7DA['RAM_TOTAL_GB']
 
         #TEMPOOOOO
-        df_filtrado30['BOOTTIME_DT'] = pd.to_datetime(df_filtrado30['BOOTTIME'], unit='s')
-        df_filtrado30['UPTIME'] = df_filtrado30['DATA_HORA'] - df_filtrado30['BOOTTIME_DT']
-        df_filtrado30['HORA_TRATAMENTO'] = pd.Timestamp.now()
+        df_filtrado7DA['BOOTTIME_DT'] = pd.to_datetime(df_filtrado7DA['BOOTTIME'], unit='s')
+        df_filtrado7DA['UPTIME'] = df_filtrado7DA['DATA_HORA'] - df_filtrado7DA['BOOTTIME_DT']
+        df_filtrado7DA['HORA_TRATAMENTO'] = pd.Timestamp.now()
 
 
 
+#####
+#####
+#####
+#####
+#####
+# PARTE 4 INICIANDO A CAMADA GOLD PARA OS JSONS
+#####
+#####
+#####
+#####
+#####
 
-    ################################################################ TRATANDO os DADOS PARA O CLIENT ################################################################
-    print("\033[38;2;255;215;0m========= GOLD ============\033[0m")
+    print("\033[38;2;255;215;0m============================== CAMADA CLIENT ============================== \033[0m")
 
     #PARA CADA EMPRESA SERÀ GERADO TRÊS CSVS: GESTOR, ANALISTA, ESPECIFICA 
-    #OLHAR O TXT!
-    #VALLE: GESTOR E ESPECIFICA
-    #GABRIEL: ANALISTA E ANALISE EXPLORATORIA R
 
-    # EXEMPLO: dados-client-empresaX-gestor
-    # EXEMPLO: dados-client-empresaX-analista
 
+
+    # INICIALIZANDO OS SETS
     dados_client_analista = {}
     dados_client_gestor = {}
     dados_client_especifica = {}
@@ -317,6 +418,8 @@ while True:
     df_filtrado['ZONA'] = df_filtrado['ZONA'].astype(str).str.strip().str.upper()
     #LIMPEZA: Tranforma em STRING, Remove espaço em branco, joga tudo para upper
 
+
+    # PRIMEIRA QUERY PARA VERIFICAR AS ZONAS DAQUELA EMPRESA
     query = """
         SELECT zona.*, empresa.razaoSocial FROM empresa 
         JOIN regiao ON idEmpresa = fkRegiaoEmpresa
@@ -327,11 +430,13 @@ while True:
     cursor.execute(query)
     zonas = cursor.fetchall()
 
+
+    # PASSANDO POR AQUELA EMPRESA
     for empresa in empresas:
         dados_client_analista = {} 
         nome_empresa_atual = str(empresa[1])
         print(Fore.LIGHTWHITE_EX + f"Analisando dados para a empresa {nome_empresa_atual} " + Style.RESET_ALL)
-
+        # PASSANDO PELA ZONA DAQUELA EMPRESA
         for zona in zonas:
             nomeZona = str(zona[1]).strip().upper() 
             idZona = zona[0]
@@ -519,7 +624,7 @@ while True:
             }
 
 
-        #LOOP DA EMPRESA PRESTA ATENÇÂO NA INDENTAÇÂO
+        # ENVIANDO O ARQUIVO PARA AWS
         if dados_client_analista:
             hora_envio = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S') 
 
@@ -782,9 +887,9 @@ while True:
             id_datacenter = datacenter[0]
 
             df_datacenter = df_filtrado[df_filtrado['DATACENTER'] == nome_datacenter.strip().upper()]
-            df_datacenter30 = df_filtrado30[df_filtrado30['DATACENTER'] == nome_datacenter.strip().upper()]
+            df_datacenter1D = df_filtrado1D[df_filtrado1D['DATACENTER'] == nome_datacenter.strip().upper()]
             df_datacenter7D = df_filtrado7D[df_filtrado7D['DATACENTER'] == nome_datacenter.strip().upper()]
-
+            df_datacenter7DA = df_filtrado7DA[df_filtrado7DA['DATACENTER'] == nome_datacenter.strip().upper()]
             query_servidores_totais = f"SELECT COUNT(idServidor) FROM servidor JOIN  zona ON fkZona = idZona JOIN datacenter ON fkDataCenter = idDataCenter WHERE  fkDataCenter = {id_datacenter};"
             cursor.execute(query_servidores_totais)
             servidores_totais = cursor.fetchall()
@@ -805,12 +910,15 @@ while True:
 
                 cpu_p99 = 0
                 ram_p99 = 0
-                tendencia_ram = 0
-                tendencia_cpu = 0
                 disco_p99 = 0
                 latencia_p99 = 0
-                tendencia_disco =0
-                tendencia_latencia = 0
+                cpu_dia_anterior = 0
+                ram_dia_anteiror = 0
+                disco_dia_anterior = 0
+                latencia_dia_anterior = 0
+
+
+
             else:
 
             
@@ -819,16 +927,20 @@ while True:
             
 
 
+                
+
                 # para o momento atual
                 cpu_p99 = round(df_datacenter['CPU'].quantile(0.99),2 )
                 ram_p99 = round(df_datacenter['RAM_PERCENT'].quantile(0.99),  2)
-                tendencia_ram = round((ram_p99 + ( float(np.polyfit(np.arange(len(df_datacenter['RAM_PERCENT'])), df_datacenter['RAM_PERCENT'], 1)[0])  * 5 )), 2)
-                tendencia_cpu = round((cpu_p99 + ( float(np.polyfit(np.arange(len(df_datacenter['CPU'])), df_datacenter['CPU'], 1)[0])  * 5 )), 2)
                 disco_p99 = round(df_datacenter['DISCO_PERCENT'].quantile(0.99), 2)
                 latencia_p99 = round(df_datacenter['LATENCIA'].quantile(0.99), 2)
-                tendencia_disco = round((disco_p99 + ( float(np.polyfit(np.arange(len(df_datacenter['DISCO_PERCENT'])), df_datacenter['DISCO_PERCENT'], 1)[0])  * 5 )), 2)
-                tendencia_latencia = round((latencia_p99 + ( float(np.polyfit(np.arange(len(df_datacenter['LATENCIA'])), df_datacenter['LATENCIA'], 1)[0])  * 5 )), 2)
+                cpu_dia_anterior = round(df_datacenter1D['CPU'].quantile(0.99),2 )
+                ram_dia_anteiror = round(df_datacenter1D['RAM_PERCENT'].quantile(0.99),  2)
+                disco_dia_anterior = round(df_datacenter1D['DISCO_PERCENT'].quantile(0.99), 2)
+                latencia_dia_anterior = round(df_datacenter1D['LATENCIA'].quantile(0.99), 2)
+                
 
+        
             if df_datacenter7D.empty:
 
 
@@ -841,42 +953,27 @@ while True:
                 tendencia_cpu_7D = 0
                 disco_p99_7D = 0
                 latencia_p99_7D = 0
-                tendencia_disco_7D =0
-                tendencia_latencia_7D = 0
+                cpu_semana_anterior = 0
+                ram_semana_anterior = 0
+                disco_semana_anterior = 0
+                latencia_semana_anterior = 0                
+
                 
             else:
 
+                
+
                 cpu_p99_7D = round(df_datacenter7D['CPU'].quantile(0.99),2 )
                 ram_p99_7D = round(df_datacenter7D['RAM_PERCENT'].quantile(0.99),  2)
-                tendencia_ram_7D = round((ram_p99 + ( float(np.polyfit(np.arange(len(df_datacenter7D['RAM_PERCENT'])), df_datacenter7D['RAM_PERCENT'], 1)[0])  * 60.4800)), 2)
-                tendencia_cpu_7D = round((cpu_p99 + ( float(np.polyfit(np.arange(len(df_datacenter7D['CPU'])), df_datacenter7D['CPU'], 1)[0])  * 60.4800)), 2)
                 disco_p99_7D = round(df_datacenter7D['DISCO_PERCENT'].quantile(0.99), 2)
                 latencia_p99_7D =  round(df_datacenter7D['LATENCIA'].quantile(0.99), 2)
-                tendencia_disco_7D =round((disco_p99 + ( float(np.polyfit(np.arange(len(df_datacenter7D['DISCO_PERCENT'])), df_datacenter7D['DISCO_PERCENT'], 1)[0])  * 60.4800 )), 2)
-                tendencia_latencia_7D =  round((latencia_p99 + ( float(np.polyfit(np.arange(len(df_datacenter7D['LATENCIA'])), df_datacenter7D['LATENCIA'], 1)[0])  * 60.4800 )), 2)
+                cpu_semana_anterior = round(df_datacenter7DA['CPU'].quantile(0.99),2 )
+                ram_semana_anterior = round(df_datacenter7DA['RAM_PERCENT'].quantile(0.99),  2)
+                disco_semana_anterior = round(df_datacenter7DA['DISCO_PERCENT'].quantile(0.99), 2)
+                latencia_semana_anterior = round(df_datacenter7DA['LATENCIA'].quantile(0.99), 2)
 
 
-            if df_datacenter30.empty:
-                cpu_p99_30D = 0
-                ram_p99_30D = 0
-                tendencia_ram_30D = 0
-                tendencia_cpu_30D = 0
-                disco_p99_30D = 0
-                latencia_p99_30D = 0
-                tendencia_disco_30D =0
-                tendencia_latencia_30D = 0
 
-                # para os ultimos 30 dias
-
-            else:
-                cpu_p99_30D = round(df_datacenter30['CPU'].quantile(0.99),2 )
-                ram_p99_30D =  round(df_datacenter30['RAM_PERCENT'].quantile(0.99),  2)
-                tendencia_ram_30D =  round((ram_p99 + ( float(np.polyfit(np.arange(len(df_datacenter30['RAM_PERCENT'])), df_datacenter30['RAM_PERCENT'], 1)[0])  * 2.592000)), 2)
-                tendencia_cpu_30D = round((cpu_p99 + ( float(np.polyfit(np.arange(len(df_datacenter30['CPU'])), df_datacenter30['CPU'], 1)[0])  * 2.592000)), 2)
-                disco_p99_30D = round(df_datacenter30['DISCO_PERCENT'].quantile(0.99), 2)
-                latencia_p99_30D =  round(df_datacenter30['LATENCIA'].quantile(0.99), 2)
-                tendencia_disco_30D =round((disco_p99 + ( float(np.polyfit(np.arange(len(df_datacenter30['DISCO_PERCENT'])), df_datacenter30['DISCO_PERCENT'], 1)[0])  * 2.592000)), 2)
-                tendencia_latencia_30D = round((latencia_p99 + ( float(np.polyfit(np.arange(len(df_datacenter30['LATENCIA'])), df_datacenter30['LATENCIA'], 1)[0])  * 2.592000)), 2)
 
 
 
@@ -894,35 +991,25 @@ while True:
                     "DADOS_ATUAIS": {
                     "CPU_P99": cpu_p99,
                     "RAM_P99": ram_p99,
-                    "TENDENCIA_RAM": tendencia_ram,
-                    "TENDENCIA_CPU": tendencia_cpu,
                     "DISCO_P99": disco_p99,
                     "LATENCIA_P99": latencia_p99,
-                    "TENDENCIA_DISCO": tendencia_disco,
-                    "TENDENCIA_LATENCIA": tendencia_latencia },
+                    "CPU_DIA_ANTERIOR": cpu_dia_anterior,
+                    "RAM_DIA_ANTERIOR": ram_dia_anteiror,
+                    "DISCO_DIA_ANTERIOR": disco_dia_anterior,
+                    "LATENCIA_DIA_ANTERIOR": latencia_dia_anterior,
+                    },
 
 
                     "DADOS_7_DIAS": {
                     "CPU_P99": cpu_p99_7D,
                     "RAM_P99": ram_p99_7D,
-                    "TENDENCIA_RAM": tendencia_ram_7D,
-                    "TENDENCIA_CPU": tendencia_cpu_7D,
                     "DISCO_P99": disco_p99_7D,
                     "LATENCIA_P99": latencia_p99_7D,
-                    "TENDENCIA_DISCO": tendencia_disco_7D,
-                    "TENDENCIA_LATENCIA": tendencia_latencia_7D },
-
-                    "DADOS_30_DIAS": {
-                    "CPU_P99": cpu_p99_30D,
-                    "RAM_P99": ram_p99_30D,
-                    "TENDENCIA_RAM": tendencia_ram_30D,
-                    "TENDENCIA_CPU": tendencia_cpu_30D,
-                    "DISCO_P99": disco_p99_30D,
-                    "LATENCIA_P99": latencia_p99_30D,
-                    "TENDENCIA_DISCO": tendencia_disco_30D,
-                    "TENDENCIA_LATENCIA": tendencia_latencia_30D },
-
-
+                    "CPU_SEMANA_ANTERIOR": cpu_semana_anterior,
+                    "RAM_SEMANA_ANTERIOR": ram_semana_anterior,
+                    "DISCO_SEMANA_ANTERIOR":disco_semana_anterior ,
+                    "LATENCIA_SEMANA_ANTERIOR": latencia_semana_anterior,
+                    },
                 }
 
         }
@@ -952,7 +1039,7 @@ while True:
 
 
     print(Fore.WHITE + "Processamento concluído. Aguardando 5 minutos para o próximo ciclo..." + Style.RESET_ALL)
-    time.sleep(120)
+    time.sleep(20)
 
 
 
