@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 
 arquivo_csv = "dados-brutos_maquina.csv"
-bucket_name = 's3-smart-data-teste'
+bucket_name = 'smart-data-teste-samuel'
 
 #STE12345          
 #SERVIDOR-DC01-WEB-05
@@ -48,11 +48,6 @@ banco_user = os.getenv('DB_USER')
 banco_senha = os.getenv('DB_PASSWORD')
 banco_nome = os.getenv('DB_NAME')
 banco_porta = int(os.getenv('DB_PORT', 3306))
-
-
-
-
-
 
 def upload_file(file_name, bucket, object_name=None):
     session = boto3.client(
