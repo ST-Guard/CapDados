@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 
 arquivo_csv = "dados-brutos_maquina.csv"
-bucket_name = 'smart-data-teste-samuel'
+bucket_name = 's3-smart-data-teste'
 
 #STE12345          
 #SERVIDOR-DC01-WEB-05
@@ -35,7 +35,7 @@ print("""\033[33m
 
 
 
-load_dotenv()
+load_dotenv(".env.dev")
 
 
 chave_acesso = os.getenv('AWS_ACCESS_KEY_ID')
@@ -48,6 +48,7 @@ banco_user = os.getenv('DB_USER')
 banco_senha = os.getenv('DB_PASSWORD')
 banco_nome = os.getenv('DB_NAME')
 banco_porta = int(os.getenv('DB_PORT', 3306))
+
 
 def upload_file(file_name, bucket, object_name=None):
     session = boto3.client(
@@ -77,10 +78,6 @@ conexao = mysql.connector.connect(
         database=banco_nome,
         port=banco_porta
 )
-
-
-
-
 
 
 
