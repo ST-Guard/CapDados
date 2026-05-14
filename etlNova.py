@@ -1,5 +1,6 @@
 import csv
 import json
+import mysql.connector
 import boto3
 from urllib.parse import unquote_plus
 from datetime import datetime, timedelta
@@ -30,8 +31,6 @@ def TrustedCsv(event, context):
         }
 
     linhas = []
-    linhas_1d = []
-    linhas_7d = []
 
     colunas_finais = {
         'EMPRESA': 'EMPRESA', 'REGIAO': 'REGIAO', 'DATACENTER': 'DATACENTER', 'ZONA': 'ZONA', 'SERVIDOR': 'SERVIDOR',
@@ -45,11 +44,9 @@ def TrustedCsv(event, context):
         'PROCESSO1_RAM': 'PROCESSO01_RAM_N', 'PROCESSO1_RAM_GB': 'PROCESSO1_RAM_T', 'PROCESSO1_RAM_PERC': 'PROCESSO1_RAM_P',
         'PROCESSO2_RAM': 'PROCESSO2_RAM_N', 'PROCESSO2_RAM_GB': 'PROCESSO2_RAM_T', 'PROCESSO2_RAM_PERC': 'PROCESSO2_RAM_P',
         'PROCESSO3_RAM': 'PROCESSO3_RAM_N', 'PROCESSO3_RAM_GB': 'PROCESSO3_RAM_T', 'PROCESSO3_RAM_PERC': 'PROCESSO3_RAM_P',
-        'BOOTTIME_DT': 'BOOTTIME', 'DATA_HORA': 'DATE', 'UPTIME': 'UPTIME', 'HORA_TRATAMENTO': 'HORA_TRATAMENTO'
+        'BOOTTIME_DT': 'BOOTTIME', 'DATA_HORA': 'DATE', 'UPTIME': 'UPTIME', 'HORA_TRATAMENTO': 'HORA_TRATAMENTO', 'DIA_SEMANA': 'DIA_SEMANA'
     }
 
-    hoje = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    ontem = hoje - timedelta(days=1)
     limite_tempo7 = datetime.now() - timedelta(days=7)
 
     for objeto in resposta["Contents"]:
@@ -92,13 +89,8 @@ def TrustedCsv(event, context):
                 for coluna_antiga, coluna_nova in colunas_finais.items():
                     linha_final[coluna_nova] = linha[coluna_antiga]
 
-                linhas.append(linha_final)
-
                 if data_hora >= limite_tempo7:
-                    linhas_7d.append(linha_final)
-
-                if ontem <= data_hora < hoje:
-                    linhas_1d.append(linha_final)
+                    linhas.append(linha_final)
 
     if len(linhas) == 0:
         return {
@@ -108,62 +100,63 @@ def TrustedCsv(event, context):
 
     colunas = list(colunas_finais.values())
 
-    caminho_tratado_geral = "/tmp/dados_tratados.csv"
-    caminho_tratado_7d = "/tmp/dados_tratados_7d.csv"
-    caminho_tratado_1d = "/tmp/dados_tratados_1d.csv"
+    caminho_tratado = "/tmp/dados_tratados.csv"
 
-    with open(caminho_tratado_geral, "w", encoding="utf-8", newline="") as saida:
+    with open(caminho_tratado, "w", encoding="utf-8", newline="") as saida:
         escritor = csv.DictWriter(saida, fieldnames=colunas, delimiter=";")
         escritor.writeheader()
         escritor.writerows(linhas)
 
     s3.upload_file(
-        caminho_tratado_geral,
+        caminho_tratado,
         bucket,
-        "trusted/geral/dados_tratados.csv"
+        "trusted/dados_tratados.csv"
     )
 
-    if len(linhas_7d) > 0:
-        with open(caminho_tratado_7d, "w", encoding="utf-8", newline="") as saida:
-            escritor = csv.DictWriter(saida, fieldnames=colunas, delimiter=";")
-            escritor.writeheader()
-            escritor.writerows(linhas_7d)
-
-        s3.upload_file(
-            caminho_tratado_7d,
-            bucket,
-            "trusted/7d/dados_tratados_7d.csv"
-        )
-
-    if len(linhas_1d) > 0:
-        with open(caminho_tratado_1d, "w", encoding="utf-8", newline="") as saida:
-            escritor = csv.DictWriter(saida, fieldnames=colunas, delimiter=";")
-            escritor.writeheader()
-            escritor.writerows(linhas_1d)
-
-        s3.upload_file(
-            caminho_tratado_1d,
-            bucket,
-            "trusted/1d/dados_tratados_1d.csv"
-        )
+    client()
 
     return {
         "statusCode": 200,
-        "body": f"CSV Tratado. Geral: {len(linhas)} linhas | 7d: {len(linhas_7d)} linhas | 1d: {len(linhas_1d)} linhas"
+        "body": f"CSV Tratado. Total: {len(linhas)} linhas"
     }
 
-def TrustedJson(event, context):
-    bucket = "smart-data-teste-samuel"
-    key = "raw/testando.json"
+def client():
+    conexao = mysql.connector.connect(
+        host="172.31.38.56",
+        user="root",
+        password="urubu100",
+        database="smartdata"
+    )
 
-    resposta = s3.get_object(Bucket=bucket, Key=key)
-    conteudo = resposta["Body"].read().decode("utf-8")
+    cursor = conexao.cursor(dictionary=True)
+    query = """
+        SELECT zona.*, empresa.razaoSocial FROM empresa 
+        JOIN regiao ON idEmpresa = fkRegiaoEmpresa
+        JOIN datacenter ON idDataCenter = fkRegiaoDataCenter 
+        JOIN zona ON fkDataCenter = idDataCenter;
+        """
+    
+    cursor.execute(query)
+    zonas = cursor.fetchall()
 
-    dados = json.loads(conteudo)
+    zonas_json = json.dumps(
+        zonas,
+        ensure_ascii=False,
+        indent=4,
+        default=str
+    )
 
-    print(dados)
+    caminho_json = "/tmp/zonas.json"
 
-    return {
-        "statusCode": 200,
-        "body": "JSON lido"
-    }
+    with open(caminho_json, "w", encoding="utf-8") as arquivo:
+        arquivo.write(zonas_json)
+    
+    s3.upload_file(
+        caminho_json,
+        "smart-data-teste-samuel",
+        "client/zonas.json"
+    )
+
+    cursor.close()
+    conexao.close()
+

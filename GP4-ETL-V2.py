@@ -1,370 +1,175 @@
-import pandas as pd
-from datetime import datetime, timedelta
-import time 
 import csv
+import json
 import boto3
 import os
 import mysql.connector
-import json
-import numpy as np
-from dotenv import load_dotenv
-from colorama import Fore, Style, init
-#pip install colorama
-#pip install python-dotenv
-#pip install mysql-connector-python
-#pip install pandas
+from urllib.parse import unquote_plus
+from datetime import datetime, timedelta
 
+s3 = boto3.client('s3')
 
+def lambda_handler(event, context):
 
-print("""\033[33m
-  /$$$$$$                                      /$$     /$$$$$$$              /$$              
- /$$__  $$                                    | $$    | $$__  $$            | $$              
-| $$  \__/ /$$$$$$/$$$$   /$$$$$$   /$$$$$$  /$$$$$$  | $$  \ $$  /$$$$$$  /$$$$$$    /$$$$$$ 
-|  $$$$$$ | $$_  $$_  $$ |____  $$ /$$__  $$|_  $$_/  | $$  | $$ |____  $$|_  $$_/   |____  $$
- \____  $$| $$ \ $$ \ $$  /$$$$$$$| $$  \__/  | $$    | $$  | $$  /$$$$$$$  | $$      /$$$$$$$
- /$$  \ $$| $$ | $$ | $$ /$$__  $$| $$        | $$ /$$| $$  | $$ /$$__  $$  | $$ /$$ /$$__  $$
-|  $$$$$$/| $$ | $$ | $$|  $$$$$$$| $$        |  $$$$/| $$$$$$$/|  $$$$$$$  |  $$$$/|  $$$$$$$
- \______/ |__/ |__/ |__/ \_______/|__/         \___/  |_______/  \_______/   \___/   \_______/
-                                                                                              
-                                                                                              
-\033[m""")
+    TrustedCsv(event, context)
 
+    return {
+        "statusCode": 200,
+        "body": "GG"
+    }
 
-#####
-#####
-#####
-#####
-#####
-##### PARTE 1 - CONFIGURAÇÕES DE USUARIO/ARQUIVOS
-#####
-#####
-#####
-#####
-#####
+def TrustedCsv(event, context):
+    bucket = event["Records"][0]["s3"]["bucket"]["name"]
+    prefixo = "raw/"
 
+    resposta = s3.list_objects_v2(Bucket=bucket, Prefix=prefixo)
 
-# RODANDO O ARQUIVO .ENV
-load_dotenv()
-
-
-# ACESSO AO BANCO DE DADOS
-banco_host = os.getenv('DB_HOST')
-banco_user = os.getenv('DB_USER')
-banco_senha = os.getenv('DB_PASSWORD')
-banco_nome = os.getenv('DB_NAME')
-banco_porta = int(os.getenv('DB_PORT'))
-try:
-    conexao = mysql.connector.connect(
-            host='127.0.0.1',
-            user=banco_user,
-            password=banco_senha,
-            database=banco_nome,
-            port=banco_porta
-    )
-except Exception as e:
-        raise ValueError(f"Erro ao conectar ou buscar no banco de dados: {e}")
-     
-cursor = conexao.cursor()
-query = "SELECT * FROM empresa"
-cursor.execute(query)
-empresas = cursor.fetchall()
-
-
-
-# ACESSO AO BUCKET
-chave_acesso = os.getenv('AWS_ACCESS_KEY_ID')
-chave_secreta = os.getenv('AWS_SECRET_ACCESS_KEY')
-token_sessao = os.getenv('AWS_SESSION_TOKEN')
-s3_cliente = boto3.client(
-        's3',
-        aws_access_key_id=chave_acesso,
-        aws_secret_access_key=chave_secreta,
-        aws_session_token=token_sessao 
-    )
-
-
-
-# DEFININDO A FUNÇÃO DE CONEXÃO DO BOTO3
-def upload_file(file_name, bucket, object_name=None):
-    # If S3 object_name was not specified, use file_name
-    if object_name is None:
-        object_name = os.p(file_name)
-    try:
-        print("mandado pra aws")
-        response = s3_cliente.upload_file(file_name, bucket, object_name)
-    except:
-        print("nao foi enviado")
-        return False
-    return True
-
-
-
-
-
-# CONVERTE OS TIPOS DE NUMEROS DO NUMPY, PARA QUE ELES POSSAM SER ENVIADOS AO JSON
-def json_serial(obj):
-    import numpy as np
-    if isinstance(obj, (np.float64, np.float32)):
-        return float(obj)
-    raise TypeError(f"Tipo {type(obj)} não é serializável")
-
-
-
-
-
-# INICIANDO O ETL NA CAMADA SILVER
-while True:
-    print(Fore.WHITE + "\n ---------- INICIANDO CICLO DE PROCESSAMENTO ETL (A cada 5 minutos) ----------" + Style.RESET_ALL)
-    print()
-
-
-#####
-#####
-#####
-#####
-#####   
-##### PARTE 2 - EXTRAÇÃO
-#####
-#####
-#####
-#####
-
-
-   
-   # DEFININDO O NOME DO BUCKET E DA PASTA ONDE OS ARQUIVOS DO RAW  VÃO SER EXTRAIDOS 
-    bucket_name = 's3-smart-data-teste'
-    prefixo_pasta = 'raw/'
-    pasta_local_destino = 'dados_brutos_raw'
-    
-
-    # TENTANDO LISTAR TODOS OS OS OBJETOS DO RAW
-    try:
-        
-        resposta_s3 = s3_cliente.list_objects_v2(Bucket=bucket_name, Prefix=prefixo_pasta)
-    except Exception as e:
-        print(f"Erro ao acessar o bucket S3: {e}")
-        conexao.close()
-        continue
-
-    # VERIFICANDO SE EXISTEM ARQUIVOS NA PASTA RAW
-    if 'Contents' not in resposta_s3:
-        print("Nenhum arquivo encontrado na pasta raw. Esperando proximo ciclo")
-        conexao.close()
-        continue
-    
-
-    # CRIANDO A PASTA ONDE OS ARQUIVOS DA RAW SERÃO INSTALADOS
-    os.makedirs(pasta_local_destino, exist_ok=True)
-
-    # DEFININDO A LISTA ONDE SERÃO JUNTADOS EM TODOS OS DATAFRAMES
-    lista_dataframes = [] 
-    
-    print("\033[38;5;130m============================== CAMADA RAW ============================== \033[0m")
-
-
-    # PEGANDO A LISTA DO LIST OBJECTS E ACESSANDO UMA POR UMA
-    for resposta in resposta_s3['Contents']:
-
-        # ACESSANDO O ID DO ARQUIVO EM ESPECIFICO
-        caminho_s3 = resposta['Key'] 
-        
-        # O S3 as vezes retorna a propria pasta vazia como um respostaeto. Só ignora
-        if caminho_s3.endswith('/') or resposta['Size'] == 0:
-            continue
-        
-
-        # CRIA UM NOME TEMPORARIO PARA O ARQUIVO
-        nome_puro = os.path.basename(caminho_s3)
-        # CRIA UM NOME LOCAL TEMPORARIO PARA O ARQUIVO
-        nome_arquivo_local = os.path.join(pasta_local_destino, nome_puro)
-        
-
-        # TENTANDO FAZER O DOWNLOAD DO ARQUIVO E LENDO 
-        try:
-            print(f"Baixando arquivo: {caminho_s3} ...")
-            s3_cliente.download_file(bucket_name, caminho_s3, nome_arquivo_local)
-            
-
-            # LENDO OS ARQUIVOS E COLOCANDO NA LISTA DOS DATAFRAMES
-            df_temp = pd.read_csv(nome_arquivo_local, sep=';')
-            lista_dataframes.append(df_temp)
-            
-            
-        except Exception as e:
-            print(f"Erro ao baixar ou ler o arquivo {caminho_s3}: {e}")
-
-   
-    # JUNTAR TUDO NO PANDAS E COMEÇAR O TRATAMENTO
-    if not lista_dataframes:
-        print("Nenhum CSV válido foi lido. Aguardando proximo ciclo...")
-        conexao.close()
-        time.sleep(120)
-        continue
-
-    # JUNTA TOODS OS DATAFRAMES EM APENAS 1 SÓ PARA A INICIAÇÃO DA CAMADA SILVER
-    dados_brutos = pd.concat(lista_dataframes, ignore_index=True)
-    print(Fore.GREEN + f"Sucesso! {len(lista_dataframes)} arquivos combinados. Total de {len(dados_brutos)} linhas." + Style.RESET_ALL)
-
-
-#####
-#####
-#####
-#####
-#####
-# PARTE 3 INICIO DA CAMADA SILVER
-#####
-#####
-#####
-#####
-#####
-
-    print("\033[37m============================== CAMADA TRUSTED ==============================  \033[0m")
-
-    # TRANSFORMANDO A DATA DOS DADOS BRUTOS DE STRING PARA TIPO DATA
-    dados_brutos['DATA_HORA'] = pd.to_datetime(dados_brutos['DATA_HORA'], format="mixed", errors='coerce')
-
-    # DEFININDO O LIMITE DE TEMPO
-    limite_tempo = pd.Timestamp.now() - timedelta(minutes=5)
-    df_filtrado = dados_brutos[dados_brutos['DATA_HORA'] >= limite_tempo].copy()
-
-
-    #  PEGANDO OS DADOS FILTRADOS QUE ESTÃO NO LIMITE DE TEMPO E TRANSFORMANDO ELES EM DADOS ESPECIFICOS
-    if df_filtrado.empty:
-        print("Nenhum dado encontrado nos ultimos 5 minutos")
-    else:
-        print(f"Encontradas {len(df_filtrado)} linhas para processar.")
-
-        df_filtrado['RAM_TOTAL_GB'] = (df_filtrado['RAM_TOTAL'] / (1024 ** 3)).round(2)
-        df_filtrado['RAM_USADA_GB'] = (df_filtrado['RAM_USADA'] / (1024 ** 3)).round(2)
-        df_filtrado['DISCO_TOTAL_GB'] = (df_filtrado['DISCO_TOTAL'] / (1024 ** 3)).round(2)
-        df_filtrado['DISCO_USADO_GB'] = (df_filtrado['DISCO_USADO'] / (1024 ** 3)).round(2)
-        df_filtrado['LATENCIA'] = df_filtrado['LATENCIA'].round(2)
-        df_filtrado['PROCESSO1_RAM_GB'] = (df_filtrado['PORCENTAGEM_PROCESSO1_RAM'] / (1024 ** 3)).round(2)
-        df_filtrado['PROCESSO2_RAM_GB'] = (df_filtrado['PORCENTAGEM_PROCESSO2_RAM'] / (1024 ** 3)).round(2)
-        df_filtrado['PROCESSO3_RAM_GB'] = (df_filtrado['PORCENTAGEM_PROCESSO3_RAM'] / (1024 ** 3)).round(2)
-        df_filtrado['PROCESSO1_RAM_PERC'] = (df_filtrado['PROCESSO1_RAM_GB'] * 100) / df_filtrado['RAM_TOTAL_GB']
-        df_filtrado['PROCESSO2_RAM_PERC'] = (df_filtrado['PROCESSO2_RAM_GB'] * 100) / df_filtrado['RAM_TOTAL_GB']
-        df_filtrado['PROCESSO3_RAM_PERC'] = (df_filtrado['PROCESSO3_RAM_GB'] * 100) / df_filtrado['RAM_TOTAL_GB']
-
-        #TEMPOOOOO
-        df_filtrado['BOOTTIME_DT'] = pd.to_datetime(df_filtrado['BOOTTIME'], unit='s')
-        df_filtrado['UPTIME'] = df_filtrado['DATA_HORA'] - df_filtrado['BOOTTIME_DT']
-        df_filtrado['HORA_TRATAMENTO'] = pd.Timestamp.now()
-
-        colunas_finais = {
-            'EMPRESA': 'EMPRESA', 'REGIAO': 'REGIAO', 'DATACENTER': 'DATACENTER', 'ZONA': 'ZONA', 'SERVIDOR': 'SERVIDOR',
-            'CPU': 'CPU_PER', 'QTD_NUCLEOS': 'QTD_NUCLEOS', 'RAM_TOTAL_GB': 'RAM_TOTAL', 'RAM_USADA_GB': 'RAM_USADO', 
-            'RAM_PERCENT': 'RAM_PER', 'DISCO_TOTAL_GB': 'DISCO_TOTAL', 'DISCO_USADO_GB': 'DISCO_USADO', 'DISCO_PERCENT': 'DISCO_PER',
-            'LATENCIA': 'LATENCIA', 'PACOTES_ENVIADOS': 'PACOTES_ENV', 'PACOTES_RECEBIDOS': 'PACOTES_RCB', 'PACOTES_PERDIDOS': 'PACOTES_PER',
-            'QTD_PR': 'QTR_PR', 'USO_USER': 'USO_USER', 'USO_SISTEM': 'USO_SISTEM',
-            'PROCESSO1_CPU': 'PROCESSO01_CPU_N', 'PORCENTAGEM_PROCESSO1_CPU': 'PROCESSO1_CPU_P',
-            'PROCESSO2_CPU': 'PROCESSO2_CPU_N', 'PORCENTAGEM_PROCESSO2_CPU': 'PROCESSO2_CPU_P',
-            'PROCESSO3_CPU': 'PROCESSO3_CPU_N', 'PORCENTAGEM_PROCESSO3_CPU': 'PROCESSO3_CPU_P',
-            'PROCESSO1_RAM': 'PROCESSO01_RAM_N', 'PROCESSO1_RAM_GB': 'PROCESSO1_RAM_T', 'PROCESSO1_RAM_PERC': 'PROCESSO1_RAM_P',
-            'PROCESSO2_RAM': 'PROCESSO2_RAM_N', 'PROCESSO2_RAM_GB': 'PROCESSO2_RAM_T', 'PROCESSO2_RAM_PERC': 'PROCESSO2_RAM_P',
-            'PROCESSO3_RAM': 'PROCESSO3_RAM_N', 'PROCESSO3_RAM_GB': 'PROCESSO3_RAM_T', 'PROCESSO3_RAM_PERC': 'PROCESSO3_RAM_P',
-            'BOOTTIME_DT': 'BOOTTIME', 'DATA_HORA': 'DATE', 'UPTIME': 'UPTIME', 'HORA_TRATAMENTO': 'HORA_TRATAMENTO'
+    if "Contents" not in resposta:
+        return {
+            "statusCode": 400,
+            "body": "Nenhum arquivo encontrado em raw/"
         }
 
-        df_silver = df_filtrado.rename(columns=colunas_finais)[list(colunas_finais.values())]
-        df_silver.to_csv('dados-tratados.csv', sep=';', index=False, mode='a', header=not pd.io.common.file_exists('dados-tratados.csv'))
+    linhas = []
+    linhas_1d = []
+    linhas_7d = []
 
-        hora_envio = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S') 
-        upload_file('dados-tratados.csv', bucket_name, f'treated/dados_tratados.csv')
-        print(Fore.GREEN +"Dados tratados e enviados com sucesso para a AWS!"+ Style.RESET_ALL)
+    colunas_finais = {
+        'EMPRESA': 'EMPRESA', 'REGIAO': 'REGIAO', 'DATACENTER': 'DATACENTER', 'ZONA': 'ZONA', 'SERVIDOR': 'SERVIDOR',
+        'CPU': 'CPU_PER', 'QTD_NUCLEOS': 'QTD_NUCLEOS', 'RAM_TOTAL_GB': 'RAM_TOTAL', 'RAM_USADA_GB': 'RAM_USADO',
+        'RAM_PERCENT': 'RAM_PER', 'DISCO_TOTAL_GB': 'DISCO_TOTAL', 'DISCO_USADO_GB': 'DISCO_USADO', 'DISCO_PERCENT': 'DISCO_PER',
+        'LATENCIA': 'LATENCIA', 'PACOTES_ENVIADOS': 'PACOTES_ENV', 'PACOTES_RECEBIDOS': 'PACOTES_RCB', 'PACOTES_PERDIDOS': 'PACOTES_PER',
+        'QTD_PR': 'QTR_PR', 'USO_USER': 'USO_USER', 'USO_SISTEM': 'USO_SISTEM',
+        'PROCESSO1_CPU': 'PROCESSO01_CPU_N', 'PORCENTAGEM_PROCESSO1_CPU': 'PROCESSO1_CPU_P',
+        'PROCESSO2_CPU': 'PROCESSO2_CPU_N', 'PORCENTAGEM_PROCESSO2_CPU': 'PROCESSO2_CPU_P',
+        'PROCESSO3_CPU': 'PROCESSO3_CPU_N', 'PORCENTAGEM_PROCESSO3_CPU': 'PROCESSO3_CPU_P',
+        'PROCESSO1_RAM': 'PROCESSO01_RAM_N', 'PROCESSO1_RAM_GB': 'PROCESSO1_RAM_T', 'PROCESSO1_RAM_PERC': 'PROCESSO1_RAM_P',
+        'PROCESSO2_RAM': 'PROCESSO2_RAM_N', 'PROCESSO2_RAM_GB': 'PROCESSO2_RAM_T', 'PROCESSO2_RAM_PERC': 'PROCESSO2_RAM_P',
+        'PROCESSO3_RAM': 'PROCESSO3_RAM_N', 'PROCESSO3_RAM_GB': 'PROCESSO3_RAM_T', 'PROCESSO3_RAM_PERC': 'PROCESSO3_RAM_P',
+        'BOOTTIME_DT': 'BOOTTIME', 'DATA_HORA': 'DATE', 'UPTIME': 'UPTIME', 'HORA_TRATAMENTO': 'HORA_TRATAMENTO'
+    }
 
-
-
-    # TRATANDO OS DADOS DO DIA ANTERIOR
-
-
-    hoje = pd.Timestamp.now().normalize()
+    hoje = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     ontem = hoje - timedelta(days=1)
-    # o normalize serve para colocar sempre a data em 00:00:00
-    df_filtrado1D = dados_brutos[(dados_brutos['DATA_HORA'] >= ontem) & (dados_brutos['DATA_HORA'] < hoje)].copy()
+    limite_tempo7 = datetime.now() - timedelta(days=7)
 
-    if df_filtrado1D.empty:
-        print("Nas 24 horas anteriores")
-    else:
-        print(f"Encontradas {len(df_filtrado)} linhas para processar.")
+    for objeto in resposta["Contents"]:
+        key = unquote_plus(objeto["Key"])
 
-        df_filtrado1D['RAM_TOTAL_GB'] = (df_filtrado1D['RAM_TOTAL'] / (1024 ** 3)).round(2)
-        df_filtrado1D['RAM_USADA_GB'] = (df_filtrado1D['RAM_USADA'] / (1024 ** 3)).round(2)
-        df_filtrado1D['DISCO_TOTAL_GB'] = (df_filtrado1D['DISCO_TOTAL'] / (1024 ** 3)).round(2)
-        df_filtrado1D['DISCO_USADO_GB'] = (df_filtrado1D['DISCO_USADO'] / (1024 ** 3)).round(2)
-        df_filtrado1D['LATENCIA'] = df_filtrado1D['LATENCIA'].round(2)
-        df_filtrado1D['PROCESSO1_RAM_GB'] = (df_filtrado1D['PORCENTAGEM_PROCESSO1_RAM'] / (1024 ** 3)).round(2)
-        df_filtrado1D['PROCESSO2_RAM_GB'] = (df_filtrado1D['PORCENTAGEM_PROCESSO2_RAM'] / (1024 ** 3)).round(2)
-        df_filtrado1D['PROCESSO3_RAM_GB'] = (df_filtrado1D['PORCENTAGEM_PROCESSO3_RAM'] / (1024 ** 3)).round(2)
-        df_filtrado1D['PROCESSO1_RAM_PERC'] = (df_filtrado1D['PROCESSO1_RAM_GB'] * 100) / df_filtrado1D['RAM_TOTAL_GB']
-        df_filtrado1D['PROCESSO2_RAM_PERC'] = (df_filtrado1D['PROCESSO2_RAM_GB'] * 100) / df_filtrado1D['RAM_TOTAL_GB']
-        df_filtrado1D['PROCESSO3_RAM_PERC'] = (df_filtrado1D['PROCESSO3_RAM_GB'] * 100) / df_filtrado1D['RAM_TOTAL_GB']
+        if key.endswith("/") or objeto["Size"] == 0:
+            continue
 
-        #TEMPOOOOO
-        df_filtrado1D['BOOTTIME_DT'] = pd.to_datetime(df_filtrado1D['BOOTTIME'], unit='s')
-        df_filtrado1D['UPTIME'] = df_filtrado1D['DATA_HORA'] - df_filtrado1D['BOOTTIME_DT']
-        df_filtrado1D['HORA_TRATAMENTO'] = pd.Timestamp.now()
+        nome_arquivo = key.split("/")[-1]
+        caminho_local = f"/tmp/{nome_arquivo}"
+
+        s3.download_file(bucket, key, caminho_local)
+
+        with open(caminho_local, "r", encoding="utf-8") as entrada:
+            leitor = csv.DictReader(entrada, delimiter=";")
+
+            for linha in leitor:
+                data_hora = datetime.fromisoformat(linha["DATA_HORA"])
+
+                linha["RAM_TOTAL_GB"] = round(float(linha["RAM_TOTAL"]) / (1024 ** 3), 2)
+                linha["RAM_USADA_GB"] = round(float(linha["RAM_USADA"]) / (1024 ** 3), 2)
+                linha["DISCO_TOTAL_GB"] = round(float(linha["DISCO_TOTAL"]) / (1024 ** 3), 2)
+                linha["DISCO_USADO_GB"] = round(float(linha["DISCO_USADO"]) / (1024 ** 3), 2)
+                linha["LATENCIA"] = round(float(linha["LATENCIA"]), 2)
+
+                linha["PROCESSO1_RAM_GB"] = round(float(linha["PORCENTAGEM_PROCESSO1_RAM"]) / (1024 ** 3), 2)
+                linha["PROCESSO2_RAM_GB"] = round(float(linha["PORCENTAGEM_PROCESSO2_RAM"]) / (1024 ** 3), 2)
+                linha["PROCESSO3_RAM_GB"] = round(float(linha["PORCENTAGEM_PROCESSO3_RAM"]) / (1024 ** 3), 2)
+
+                linha["PROCESSO1_RAM_PERC"] = round((float(linha["PROCESSO1_RAM_GB"]) * 100) / float(linha["RAM_TOTAL_GB"]), 2)
+                linha["PROCESSO2_RAM_PERC"] = round((float(linha["PROCESSO2_RAM_GB"]) * 100) / float(linha["RAM_TOTAL_GB"]), 2)
+                linha["PROCESSO3_RAM_PERC"] = round((float(linha["PROCESSO3_RAM_GB"]) * 100) / float(linha["RAM_TOTAL_GB"]), 2)
+
+                linha["BOOTTIME_DT"] = datetime.fromtimestamp(float(linha["BOOTTIME"]))
+                linha["UPTIME"] = str(data_hora - linha["BOOTTIME_DT"])
+                linha["HORA_TRATAMENTO"] = str(datetime.now())
+
+                linha_final = {}
+
+                for coluna_antiga, coluna_nova in colunas_finais.items():
+                    linha_final[coluna_nova] = linha[coluna_antiga]
+
+                linhas.append(linha_final)
+
+                if data_hora >= limite_tempo7:
+                    linhas_7d.append(linha_final)
+
+                if ontem <= data_hora < hoje:
+                    linhas_1d.append(linha_final)
+
+    if len(linhas) == 0:
+        return {
+            "statusCode": 400,
+            "body": "Nenhum CSV válido foi processado"
+        }
+
+    colunas = list(colunas_finais.values())
+
+    caminho_tratado_geral = "/tmp/dados_tratados.csv"
+    caminho_tratado_7d = "/tmp/dados_tratados_7d.csv"
+    caminho_tratado_1d = "/tmp/dados_tratados_1d.csv"
+
+    with open(caminho_tratado_geral, "w", encoding="utf-8", newline="") as saida:
+        escritor = csv.DictWriter(saida, fieldnames=colunas, delimiter=";")
+        escritor.writeheader()
+        escritor.writerows(linhas)
+
+    s3.upload_file(
+        caminho_tratado_geral,
+        bucket,
+        "trusted/geral/dados_tratados.csv"
+    )
+
+    if len(linhas_7d) > 0:
+        with open(caminho_tratado_7d, "w", encoding="utf-8", newline="") as saida:
+            escritor = csv.DictWriter(saida, fieldnames=colunas, delimiter=";")
+            escritor.writeheader()
+            escritor.writerows(linhas_7d)
+
+        s3.upload_file(
+            caminho_tratado_7d,
+            bucket,
+            "trusted/7d/dados_tratados_7d.csv"
+        )
+
+    if len(linhas_1d) > 0:
+        with open(caminho_tratado_1d, "w", encoding="utf-8", newline="") as saida:
+            escritor = csv.DictWriter(saida, fieldnames=colunas, delimiter=";")
+            escritor.writeheader()
+            escritor.writerows(linhas_1d)
+
+        s3.upload_file(
+            caminho_tratado_1d,
+            bucket,
+            "trusted/1d/dados_tratados_1d.csv"
+        )
+
+    return {
+        "statusCode": 200,
+        "body": f"CSV Tratado. Geral: {len(linhas)} linhas | 7d: {len(linhas_7d)} linhas | 1d: {len(linhas_1d)} linhas"
+    }
 
 
-    # TRATANDO OS DADOS DA SEMANA ANTERIROR
-    limite_tempo7 = pd.Timestamp.now() - timedelta(days=7)
+def ClientCsv(event, context):
+    try:
+        conexao = mysql.connector.connect(
+            host='172.31.38.56',
+            user="root",
+            password="urubu100",
+            database="smartdata",
+            port=3306
+        )
 
-    df_filtrado7D = dados_brutos[dados_brutos['DATA_HORA'] >= limite_tempo7].copy()
-
-    if df_filtrado7D.empty:
-        print("Nenhum dado encontrado nos ultimos 7 DIAS")
-    else:
-        print(f"Encontradas {len(df_filtrado)} linhas para processar.")
-
-        df_filtrado7D['RAM_TOTAL_GB'] = (df_filtrado7D['RAM_TOTAL'] / (1024 ** 3)).round(2)
-        df_filtrado7D['RAM_USADA_GB'] = (df_filtrado7D['RAM_USADA'] / (1024 ** 3)).round(2)
-        df_filtrado7D['DISCO_TOTAL_GB'] = (df_filtrado7D['DISCO_TOTAL'] / (1024 ** 3)).round(2)
-        df_filtrado7D['DISCO_USADO_GB'] = (df_filtrado7D['DISCO_USADO'] / (1024 ** 3)).round(2)
-        df_filtrado7D['LATENCIA'] = df_filtrado7D['LATENCIA'].round(2)
-        df_filtrado7D['PROCESSO1_RAM_GB'] = (df_filtrado7D['PORCENTAGEM_PROCESSO1_RAM'] / (1024 ** 3)).round(2)
-        df_filtrado7D['PROCESSO2_RAM_GB'] = (df_filtrado7D['PORCENTAGEM_PROCESSO2_RAM'] / (1024 ** 3)).round(2)
-        df_filtrado7D['PROCESSO3_RAM_GB'] = (df_filtrado7D['PORCENTAGEM_PROCESSO3_RAM'] / (1024 ** 3)).round(2)
-        df_filtrado7D['PROCESSO1_RAM_PERC'] = (df_filtrado7D['PROCESSO1_RAM_GB'] * 100) / df_filtrado7D['RAM_TOTAL_GB']
-        df_filtrado7D['PROCESSO2_RAM_PERC'] = (df_filtrado7D['PROCESSO2_RAM_GB'] * 100) / df_filtrado7D['RAM_TOTAL_GB']
-        df_filtrado7D['PROCESSO3_RAM_PERC'] = (df_filtrado7D['PROCESSO3_RAM_GB'] * 100) / df_filtrado7D['RAM_TOTAL_GB']
-
-        #TEMPOOOOO
-        df_filtrado7D['BOOTTIME_DT'] = pd.to_datetime(df_filtrado7D['BOOTTIME'], unit='s')
-        df_filtrado7D['UPTIME'] = df_filtrado7D['DATA_HORA'] - df_filtrado7D['BOOTTIME_DT']
-        df_filtrado7D['HORA_TRATAMENTO'] = pd.Timestamp.now()
-
-    
-
-
-
-
-    # TRATANDO OS DADOS DA SEMANA ANTERIROR
-    limite_tempo7 = pd.Timestamp.now() - timedelta(days=14)
-    
-    semana_anterior = limite_tempo7 + timedelta(days=7)
-    df_filtrado7DA = dados_brutos[(dados_brutos['DATA_HORA'] >= limite_tempo7) & (dados_brutos['DATA_HORA'] <= semana_anterior)].copy()
-
-    if df_filtrado7D.empty:
-        print("Nenhum dado encontrado nos ultimos 7 DIAS")
-    else:
-        print(f"Encontradas {len(df_filtrado)} linhas para processar.")
-
-        df_filtrado7DA['RAM_TOTAL_GB'] = (df_filtrado7DA['RAM_TOTAL'] / (1024 ** 3)).round(2)
-        df_filtrado7DA['RAM_USADA_GB'] = (df_filtrado7DA['RAM_USADA'] / (1024 ** 3)).round(2)
-        df_filtrado7DA['DISCO_TOTAL_GB'] = (df_filtrado7DA['DISCO_TOTAL'] / (1024 ** 3)).round(2)
-        df_filtrado7DA['DISCO_USADO_GB'] = (df_filtrado7DA['DISCO_USADO'] / (1024 ** 3)).round(2)
-        df_filtrado7DA['LATENCIA'] = df_filtrado7DA['LATENCIA'].round(2)
-        df_filtrado7DA['PROCESSO1_RAM_GB'] = (df_filtrado7DA['PORCENTAGEM_PROCESSO1_RAM'] / (1024 ** 3)).round(2)
-        df_filtrado7DA['PROCESSO2_RAM_GB'] = (df_filtrado7DA['PORCENTAGEM_PROCESSO2_RAM'] / (1024 ** 3)).round(2)
-        df_filtrado7DA['PROCESSO3_RAM_GB'] = (df_filtrado7DA['PORCENTAGEM_PROCESSO3_RAM'] / (1024 ** 3)).round(2)
-        df_filtrado7DA['PROCESSO1_RAM_PERC'] = (df_filtrado7DA['PROCESSO1_RAM_GB'] * 100) / df_filtrado7DA['RAM_TOTAL_GB']
-        df_filtrado7DA['PROCESSO2_RAM_PERC'] = (df_filtrado7DA['PROCESSO2_RAM_GB'] * 100) / df_filtrado7DA['RAM_TOTAL_GB']
-        df_filtrado7DA['PROCESSO3_RAM_PERC'] = (df_filtrado7DA['PROCESSO3_RAM_GB'] * 100) / df_filtrado7DA['RAM_TOTAL_GB']
-
-        #TEMPOOOOO
-        df_filtrado7DA['BOOTTIME_DT'] = pd.to_datetime(df_filtrado7DA['BOOTTIME'], unit='s')
-        df_filtrado7DA['UPTIME'] = df_filtrado7DA['DATA_HORA'] - df_filtrado7DA['BOOTTIME_DT']
-        df_filtrado7DA['HORA_TRATAMENTO'] = pd.Timestamp.now()
+    except Exception as e:
+            raise ValueError(f"Erro ao conectar ou buscar no banco de dados: {e}")
+        
+    cursor = conexao.cursor()
+    query = "SELECT * FROM empresa"
+    cursor.execute(query)
+    empresas = cursor.fetchall()
 
 
 
@@ -1040,7 +845,5 @@ while True:
 
     print(Fore.WHITE + "Processamento concluído. Aguardando 5 minutos para o próximo ciclo..." + Style.RESET_ALL)
     time.sleep(20)
-
-
 
    

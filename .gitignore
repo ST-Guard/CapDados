@@ -4,4 +4,4 @@
 dados-brutos_maquina*
 dados-tratados*
 .venv
-
+.env.dev

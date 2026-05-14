@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 
 arquivo_csv = "dados-brutos_maquina.csv"
-bucket_name = 's3-smart-data-teste'
+bucket_name = 'smart-data-teste-samuel'
 
 #STE12345          
 #SERVIDOR-DC01-WEB-05
@@ -79,13 +79,7 @@ conexao = mysql.connector.connect(
         port=banco_porta
 )
 
-
-
 token = input("Digite o token da empresa: ")
-
-
-
-
 
 cursor = conexao.cursor()
 query_empresa = f"SELECT * FROM empresa WHERE tokenEmpresa ='{token}';" 
