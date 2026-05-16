@@ -33,9 +33,9 @@ print("""\033[33m
 
 load_dotenv(".env.dev")
 
-chave_acesso = os.getenv('AWS_ACCESS_KEY_ID')
-chave_secreta = os.getenv('AWS_SECRET_ACCESS_KEY')
-token_sessao = os.getenv('AWS_SESSION_TOKEN')
+chave_acesso = os.getenv('aws_access_key_id')
+chave_secreta = os.getenv('aws_secret_access_key')
+token_sessao = os.getenv('aws_session_token')
 
 # Banco de Dados
 banco_host = os.getenv('DB_HOST')

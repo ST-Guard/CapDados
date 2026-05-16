@@ -3,6 +3,8 @@ import json
 import boto3
 from urllib.parse import unquote_plus
 from datetime import datetime, timedelta
+import pandas as pd
+import io
 
 s3 = boto3.client('s3')
 
@@ -13,7 +15,7 @@ def lambda_handler(event, context):
     
     try:
         print("Iniciando Trusted")
-        resultado_trusted = TrustedJson(event, context)
+        resultado_trusted = TrustedCsv(event, context)
 
         if isinstance(resultado_trusted, dict) and "chave" in resultado_trusted:
             print(f"Sucesso Trusted: {resultado_trusted['mensagem']}")
@@ -41,7 +43,7 @@ def lambda_handler(event, context):
 
 
 # Função que faz o tratamento dos dados
-def TrustedJson(event, context):
+def TrustedCsv(event, context):
     #Pega o arquivo que chegou no Lambda
     registro = event["Records"][0]["s3"]
     bucket = registro["bucket"]["name"]
@@ -56,12 +58,13 @@ def TrustedJson(event, context):
     nome_base = nome_arquivo.rsplit('.', 1)[0]
 
     caminho_local_entrada = f"/tmp/{nome_arquivo}"
-    caminho_local_mestre = "/tmp/dados_mestre.json"
-    chave_destino_mestre = "trusted/dados_mestre.json"
+    caminho_local_mestre = "/tmp/dados_mestre.csv"
+    chave_destino_mestre = "trusted/dados_tratados.csv"
 
     #Baixa o arquivo em uma pasta temporaria
     print(f"Baixando o arquivo entrada: {key}")
     s3.download_file(bucket, key, caminho_local_entrada)
+    
 
     colunas_finais = {
         'EMPRESA': 'EMPRESA', 'REGIAO': 'REGIAO', 'DATACENTER': 'DATACENTER', 'ZONA': 'ZONA', 'SERVIDOR': 'SERVIDOR',
@@ -128,7 +131,9 @@ def TrustedJson(event, context):
         print(f"Tentando ler arquivo mestre existente: {chave_destino_mestre}")
         resposta_mestre = s3.get_object(Bucket=bucket, Key=chave_destino_mestre)
         conteudo_mestre = resposta_mestre['Body'].read().decode('utf-8')
-        dados_unificados = json.loads(conteudo_mestre)
+        leitor_mestre = csv.DictReader(conteudo_mestre.splitlines(), delimiter=";")
+        dados_unificados = list(leitor_mestre)
+        
         print(f"Arquivo mestre carregado com {len(dados_unificados)} linhas.")
     except Exception as e:
         print("Arquivo mestre nao encontrado. Criando um novo do zero.")
@@ -136,10 +141,14 @@ def TrustedJson(event, context):
     
     dados_unificados.extend(linhas)
     
-    with open(caminho_local_mestre, "w", encoding="utf-8") as saida:
-        json.dump(dados_unificados, saida, indent=4, ensure_ascii=False, default=str)
+    colunas = list(colunas_finais.values())
+    
+    with open(caminho_local_mestre, "w", encoding="utf-8", newline="") as saida:
+        escritor = csv.DictWriter(saida, fieldnames=colunas, delimiter=";")
+        escritor.writeheader()
+        escritor.writerows(dados_unificados)
 
-    print(f"Fazendo upload do JSON unificado para: {chave_destino_mestre}")
+    print(f"Fazendo upload do CSV unificado para: {chave_destino_mestre}")
     s3.upload_file(caminho_local_mestre, bucket, chave_destino_mestre)
 
     return {
@@ -155,7 +164,8 @@ def ClientGeral(bucket, chave):
     
     resposta = s3.get_object(Bucket=bucket, Key=chave)
     conteudo_texto = resposta['Body'].read().decode('utf-8')
-    dados_dicionario = json.loads(conteudo_texto)
+    leitor = csv.DictReader(conteudo_texto.splitlines(), delimiter=";")
+    dados_dicionario = list(leitor)
     
     respFinanceiro = dashFinanceiro(dados_dicionario)
     respGestora = dashGestora(dados_dicionario)
@@ -193,6 +203,8 @@ def ClientGeral(bucket, chave):
 # ZONA DE TRABALHO
 
 def dashFinanceiro(dados):
+
+    
     return {"tipo": "financeiro", "total_dados": len(dados)} 
 
 def dashGestora(dados):
