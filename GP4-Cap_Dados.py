@@ -33,9 +33,9 @@ print("""\033[33m
 
 load_dotenv(".env.dev")
 
-chave_acesso = os.getenv('aws_access_key_id')
-chave_secreta = os.getenv('aws_secret_access_key')
-token_sessao = os.getenv('aws_session_token')
+
+
+
 
 # Banco de Dados
 banco_host = os.getenv('DB_HOST')
@@ -55,9 +55,9 @@ conexao = mysql.connector.connect(
 def upload_file(file_name, bucket, object_name=None):
     session = boto3.client(
         's3',
-        aws_access_key_id=chave_acesso,
-        aws_secret_access_key=chave_secreta,
-        aws_session_token=token_sessao 
+        aws_access_key_id=os.getenv('aws_access_key_id'),
+        aws_secret_access_key=os.getenv('aws_secret_access_key'),
+        aws_session_token=os.getenv('aws_session_token')
     )
     # If S3 object_name was not specified, use file_name
     if object_name is None:
@@ -363,12 +363,12 @@ def capturaJson():
         default=str
     )
 
-    caminho_json = "geral.json"
+    caminho_json = "metricas.json"
 
     with open(caminho_json, "w", encoding="utf-8") as arquivo:
         arquivo.write(geral_json)
 
-    nome_arquivo_json = f"raw/geral.json"
+    nome_arquivo_json = f"raw/metricas.json"
     upload_file(caminho_json, bucket_name, nome_arquivo_json)
 
 servidor = validarServidor()
