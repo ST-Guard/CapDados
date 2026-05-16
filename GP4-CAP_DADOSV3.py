@@ -425,6 +425,7 @@ def capturaCSV(servidor):
         csvfile.flush()
 
         nome_arquivo_s3 = f"raw/{dados_dict['EMPRESA']}_{dados_dict['DATACENTER']}_{dados_dict['ZONA']}_{dados_dict['SERVIDOR']}_dadosBrutos.csv"
+        print("Enviando dados capturados")
         upload_file(arquivo_csv, bucket_name, nome_arquivo_s3)
 
 
@@ -537,6 +538,7 @@ def capturaJson():
         arquivo.write(geral_json)
 
     nome_arquivo_json = "raw/metricas.json"
+    print("Enviando metricas em json")
     upload_file(caminho_json, bucket_name, nome_arquivo_json)
 
 
