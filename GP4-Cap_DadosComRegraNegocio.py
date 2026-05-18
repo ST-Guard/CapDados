@@ -13,7 +13,7 @@ import random
 
 
 arquivo_csv = "dados-brutos_maquina.csv"
-bucket_name = 's3-smart-data-teste'
+bucket_name = 'smartdatabucket1'
 
 #STE12345          
 #SERVIDOR-DC01-WEB-05
@@ -39,9 +39,9 @@ print("""\033[33m
 load_dotenv(".env.dev")
 
 
-chave_acesso = os.getenv('AWS_ACCESS_KEY_ID')
-chave_secreta = os.getenv('AWS_SECRET_ACCESS_KEY')
-token_sessao = os.getenv('AWS_SESSION_TOKEN')
+chave_acesso = os.getenv('aws_access_key_id')
+chave_secreta = os.getenv('aws_secret_access_key')
+token_sessao = os.getenv('aws_session_token')
 
 # Banco de Dados
 banco_host = os.getenv('DB_HOST')
@@ -55,23 +55,23 @@ banco_porta = int(os.getenv('DB_PORT', 3306))
 
 
 
-# def upload_file(file_name, bucket, object_name=None):
-#     session = boto3.client(
-#         's3',
-#           aws_access_key_id=chave_acesso,
-#         aws_secret_access_key=chave_secreta,
-#         aws_session_token=token_sessao 
-#     )
-#     # If S3 object_name was not specified, use file_name
-#     if object_name is None:
-#         object_name = file_name
+def upload_file(file_name, bucket, object_name=None):
+    session = boto3.client(
+        's3', region_name='us-east-1',
+          aws_access_key_id=chave_acesso,
+        aws_secret_access_key=chave_secreta,
+        aws_session_token=token_sessao 
+    )
+    # If S3 object_name was not specified, use file_name
+    if object_name is None:
+        object_name = file_name
 
-#     try:
-#         response = session.upload_file(file_name, bucket, object_name)
-#         print("enviado para o S3 com sucesso")
-#     except ValueError as e:
-#         print(f"Erro ao enviar para o S3: {e}")
-#     return True
+    try:
+        response = session.upload_file(file_name, bucket, object_name)
+        print("enviado para o S3 com sucesso")
+    except ValueError as e:
+        print(f"Erro ao enviar para o S3: {e}")
+    return True
 
 
 
@@ -350,7 +350,7 @@ else:
                     'EMPRESA': f'{servidor[0][16]}',
                     'REGIAO': f'{servidor[0][12]}',
                     'DATACENTER': f'{servidor[0][21]}',
-                    'ZONA': f'{servidor[0][6]}',
+                    'ZONA': f'{servidor[0][6].replace(" ", "")}',
                     'SERVIDOR': f'{servidor[0][1]}',
                     'CPU': cpu_negocio,
                     'RAM_TOTAL': ram.total,
@@ -436,7 +436,7 @@ else:
                 CSV_DIC_WRITER.writerow(dados_dict)
                 csvfile.flush()
                 nome_arquivo_s3 = f"raw/{dados_dict['EMPRESA']}_{dados_dict['DATACENTER']}_{dados_dict['ZONA']}_{dados_dict['SERVIDOR']}_dadosBrutos.csv"
-                #upload_file(arquivo_csv, bucket_name, nome_arquivo_s3)
+                upload_file(arquivo_csv, bucket_name, nome_arquivo_s3)
 
 
 

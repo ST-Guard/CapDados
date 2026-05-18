@@ -3,21 +3,28 @@ import json
 import boto3
 from urllib.parse import unquote_plus
 from datetime import datetime, timedelta
+import pandas as pd
+import io
 
 s3 = boto3.client('s3')
 
 # Função inicial que chama as demais
 def lambda_handler(event, context):
-    print("Lambda Iniciada!")
+    print("Lambda Iniciada! 📍" )
     print(f"Evento recebido: {event}")
-    
+
+    #Verifica se é o JSON de metricas
+    registro = event["Records"][0]["s3"]
+    key = unquote_plus(registro["object"]["key"])
+    if key.lower().endswith(".json"):
+        return f"Arquivo JSON detectado ({key}). Processamento ignorado."
+        
     try:
         print("Iniciando Trusted")
-        resultado_trusted = TrustedJson(event, context)
+        resultado_trusted = TrustedCsv(event, context)
 
         if isinstance(resultado_trusted, dict) and "chave" in resultado_trusted:
             print(f"Sucesso Trusted: {resultado_trusted['mensagem']}")
-            
             
             resultado_client = ClientGeral(resultado_trusted['bucket'], resultado_trusted['chave'])
             print(f"Status ClientGeral: {resultado_client}")
@@ -41,7 +48,7 @@ def lambda_handler(event, context):
 
 
 # Função que faz o tratamento dos dados
-def TrustedJson(event, context):
+def TrustedCsv(event, context):
     #Pega o arquivo que chegou no Lambda
     registro = event["Records"][0]["s3"]
     bucket = registro["bucket"]["name"]
@@ -53,11 +60,10 @@ def TrustedJson(event, context):
 
     #Pega informações do arquivo e pasta de origem e finalidade
     nome_arquivo = key.split("/")[-1]
-    nome_base = nome_arquivo.rsplit('.', 1)[0]
 
     caminho_local_entrada = f"/tmp/{nome_arquivo}"
-    caminho_local_mestre = "/tmp/dados_mestre.json"
-    chave_destino_mestre = "trusted/dados_mestre.json"
+    caminho_local_mestre = "/tmp/dados_mestre.csv"
+    chave_destino_mestre = "trusted/dados_tratados.csv"
 
     #Baixa o arquivo em uma pasta temporaria
     print(f"Baixando o arquivo entrada: {key}")
@@ -80,70 +86,58 @@ def TrustedJson(event, context):
 
     #Defini um limite de tempo de 7 dias para tratar os dados
     limite_tempo7 = datetime.now() - timedelta(days=7)
-    linhas = []
 
     #Ler o CSV
-    with open(caminho_local_entrada, "r", encoding="utf-8") as entrada:
-        leitor = csv.DictReader(entrada, delimiter=";")
-        #Para cada linha
-        for linha in leitor:
-            data_hora = datetime.fromisoformat(linha["DATA_HORA"]).replace(tzinfo=None)
+    df = pd.read_csv(caminho_local_entrada, delimiter=";", encoding="utf-8-sig")
+    df.columns = df.columns.str.strip()
 
-            # Pula a linha se for mais velha que 7 dias
-            if data_hora < limite_tempo7:
-                continue
-        
-            linha["RAM_TOTAL_GB"] = round(float(linha.get("RAM_TOTAL", 0)) / (1024 ** 3), 2)
-            linha["RAM_USADA_GB"] = round(float(linha.get("RAM_USADA", 0)) / (1024 ** 3), 2)
-            linha["DISCO_TOTAL_GB"] = round(float(linha.get("DISCO_TOTAL", 0)) / (1024 ** 3), 2)
-            linha["DISCO_USADO_GB"] = round(float(linha.get("DISCO_USADO", 0)) / (1024 ** 3), 2)
-            linha["LATENCIA"] = round(float(linha.get("LATENCIA", 0)), 2)
+    df["DATA_HORA"] = pd.to_datetime(df["DATA_HORA"])
 
-            linha["PROCESSO1_RAM_GB"] = round(float(linha.get("PORCENTAGEM_PROCESSO1_RAM", 0)) / (1024 ** 3), 2)
-            linha["PROCESSO2_RAM_GB"] = round(float(linha.get("PORCENTAGEM_PROCESSO2_RAM", 0)) / (1024 ** 3), 2)
-            linha["PROCESSO3_RAM_GB"] = round(float(linha.get("PORCENTAGEM_PROCESSO3_RAM", 0)) / (1024 ** 3), 2)
+    # Pula a linha se for mais velha que 7 dias
+    df = df[df["DATA_HORA"] >= limite_tempo7]
 
-            if linha["RAM_TOTAL_GB"] > 0:
-                linha["PROCESSO1_RAM_PERC"] = round((linha["PROCESSO1_RAM_GB"] * 100) / linha["RAM_TOTAL_GB"], 2)
-                linha["PROCESSO2_RAM_PERC"] = round((linha["PROCESSO2_RAM_GB"] * 100) / linha["RAM_TOTAL_GB"], 2)
-                linha["PROCESSO3_RAM_PERC"] = round((linha["PROCESSO3_RAM_GB"] * 100) / linha["RAM_TOTAL_GB"], 2)
-            else:
-                linha["PROCESSO1_RAM_PERC"] = linha["PROCESSO2_RAM_PERC"] = linha["PROCESSO3_RAM_PERC"] = 0.0
-
-            linha["BOOTTIME_DT"] = datetime.fromtimestamp(float(linha.get("BOOTTIME", 0)))
-            linha["UPTIME"] = str(data_hora - linha["BOOTTIME_DT"])
-            linha["HORA_TRATAMENTO"] = str(datetime.now())
-
-            linha_final = {}
-            for coluna_antiga, coluna_nova in colunas_finais.items():
-                linha_final[coluna_nova] = linha.get(coluna_antiga, "")
-
-            linhas.append(linha_final)
-                
-    if not linhas:
+    if df.empty:
         return f"Arquivo {nome_arquivo} lido, mas nenhuma linha se qualificou (dentro de 7 dias)."
-    
-    dados_unificados = []
+
+    df["RAM_TOTAL_GB"]  = (df["RAM_TOTAL"].astype(float)  / (1024 ** 3)).round(2)
+    df["RAM_USADA_GB"]  = (df["RAM_USADA"].astype(float)  / (1024 ** 3)).round(2)
+    df["DISCO_TOTAL_GB"]= (df["DISCO_TOTAL"].astype(float) / (1024 ** 3)).round(2)
+    df["DISCO_USADO_GB"]= (df["DISCO_USADO"].astype(float) / (1024 ** 3)).round(2)
+    df["LATENCIA"]      = df["LATENCIA"].astype(float).round(2)
+
+    df["PROCESSO1_RAM_GB"] = (df["PORCENTAGEM_PROCESSO1_RAM"].astype(float) / (1024 ** 3)).round(2)
+    df["PROCESSO2_RAM_GB"] = (df["PORCENTAGEM_PROCESSO2_RAM"].astype(float) / (1024 ** 3)).round(2)
+    df["PROCESSO3_RAM_GB"] = (df["PORCENTAGEM_PROCESSO3_RAM"].astype(float) / (1024 ** 3)).round(2)
+
+    df["PROCESSO1_RAM_PERC"] = ((df["PROCESSO1_RAM_GB"] * 100) / df["RAM_TOTAL_GB"]).where(df["RAM_TOTAL_GB"] > 0, 0.0).round(2)
+    df["PROCESSO2_RAM_PERC"] = ((df["PROCESSO2_RAM_GB"] * 100) / df["RAM_TOTAL_GB"]).where(df["RAM_TOTAL_GB"] > 0, 0.0).round(2)
+    df["PROCESSO3_RAM_PERC"] = ((df["PROCESSO3_RAM_GB"] * 100) / df["RAM_TOTAL_GB"]).where(df["RAM_TOTAL_GB"] > 0, 0.0).round(2)
+
+    df["BOOTTIME_DT"]     = df["BOOTTIME"].astype(float).apply(datetime.fromtimestamp)
+    df["UPTIME"]          = (df["DATA_HORA"] - df["BOOTTIME_DT"]).astype(str)
+    df["HORA_TRATAMENTO"] = str(datetime.now())
+
+    df = df[list(colunas_finais.keys())].rename(columns=colunas_finais)
+
+    df_mestre = pd.DataFrame()
     try:
         print(f"Tentando ler arquivo mestre existente: {chave_destino_mestre}")
         resposta_mestre = s3.get_object(Bucket=bucket, Key=chave_destino_mestre)
         conteudo_mestre = resposta_mestre['Body'].read().decode('utf-8')
-        dados_unificados = json.loads(conteudo_mestre)
-        print(f"Arquivo mestre carregado com {len(dados_unificados)} linhas.")
+        df_mestre = pd.read_csv(io.StringIO(conteudo_mestre), delimiter=";")
+        print(f"Arquivo mestre carregado com {len(df_mestre)} linhas.")
     except Exception as e:
         print("Arquivo mestre nao encontrado. Criando um novo do zero.")
 
-    
-    dados_unificados.extend(linhas)
-    
-    with open(caminho_local_mestre, "w", encoding="utf-8") as saida:
-        json.dump(dados_unificados, saida, indent=4, ensure_ascii=False, default=str)
+    df_unificado = pd.concat([df_mestre, df], ignore_index=True)
 
-    print(f"Fazendo upload do JSON unificado para: {chave_destino_mestre}")
+    df_unificado.to_csv(caminho_local_mestre, sep=";", index=False, encoding="utf-8")
+
+    print(f"Fazendo upload do CSV unificado para: {chave_destino_mestre}")
     s3.upload_file(caminho_local_mestre, bucket, chave_destino_mestre)
 
     return {
-        "mensagem": f"Arquivo unificado. Adicionadas {len(linhas)} novas linhas. Total agora: {len(dados_unificados)}",
+        "mensagem": f"Arquivo unificado. Adicionadas {len(df)} novas linhas. Total agora: {len(df_unificado)}",
         "bucket": bucket,
         "chave": chave_destino_mestre
     }
@@ -169,6 +163,9 @@ def ClientGeral(bucket, chave):
  
 
     
+    df = pd.read_csv(io.StringIO(conteudo_texto), delimiter=";")
+    dados_dicionario = df.to_dict(orient="records")
+
     respFinanceiro = dashFinanceiro(dados_dicionario)
     respGestora = dashGestora(dados_dicionario)
     respAnalista = dashAnalista(dados_dicionario)
@@ -178,20 +175,20 @@ def ClientGeral(bucket, chave):
 
 
     s3.put_object(
-        Bucket=bucket, 
-        Key="client/financeiro_master.json", 
+        Bucket=bucket,
+        Key="client/financeiro_master.json",
         Body=json.dumps(respFinanceiro, default=str, indent=4)
     )
 
     s3.put_object(
-        Bucket=bucket, 
-        Key="client/gestora_master.json", 
+        Bucket=bucket,
+        Key="client/gestora_master.json",
         Body=json.dumps(respGestora, default=str, indent=4)
     )
 
     s3.put_object(
-        Bucket=bucket, 
-        Key="client/analista_master.json", 
+        Bucket=bucket,
+        Key="client/analista_master.json",
         Body=json.dumps(respAnalista, default=str, indent=4)
     )
 
@@ -208,7 +205,7 @@ def ClientGeral(bucket, chave):
 # ZONA DE TRABALHO
 
 def dashFinanceiro(dados):
-    return {"tipo": "financeiro", "total_dados": len(dados)} 
+    return {"tipo": "financeiro", "total_dados": len(dados)}
 
 def dashGestora(dados):
     return {"tipo": "gestora", "total_dados": len(dados)}
