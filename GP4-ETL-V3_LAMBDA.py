@@ -155,6 +155,8 @@ def ClientGeral(bucket, chave):
     respFinanceiro = dashFinanceiro(dados_dicionario)
     respGestora = dashGestora(dados_dicionario)
     respAnalista = dashAnalista(dados_dicionario)
+    respAlertas = dashAlertas(dados_dicionario)
+    respServidores = dashServidores(dados_dicionario)
 
     s3.put_object(
         Bucket=bucket,
@@ -173,16 +175,224 @@ def ClientGeral(bucket, chave):
         Key="client/analista_master.json",
         Body=json.dumps(respAnalista, default=str, indent=4)
     )
+
+    s3.put_object(
+        Bucket=bucket,
+        Key="client/alertas_master.json",
+        Body=json.dumps(respAlertas, default=str, indent=4)
+    )
+
+    s3.put_object(
+        Bucket=bucket,
+        Key="client/servidores_master.json",
+        Body=json.dumps(respServidores, default=str, indent=4)
+    )
+
     print("Todas as paginas processadas e atualizadas.")
     return "Lambda concluida com sucesso! ✅"
 
-# ZONA DE TRABALHO
 
-def dashFinanceiro(dados):
-    return {"tipo": "financeiro", "total_dados": len(dados)}
+# ZONA DE TRABALHO
 
 def dashGestora(dados):
     return {"tipo": "gestora", "total_dados": len(dados)}
 
 def dashAnalista(dados):
     return {"tipo": "analista", "total_dados": len(dados)}
+
+def dashAlertas(dados):
+    return {"tipo": "analista", "total_dados": len(dados)}
+
+def dashServidores(dados):
+    return {"tipo": "analista", "total_dados": len(dados)}
+
+
+
+############################################################## 💵 FINANCEIRO 💵 ###############################################################
+
+# *********************************************
+#  CONSTANTES — RECEITA
+# Receita da Steam por minuto em real: R$ 105.349,98
+# Receita a cada 5 minutos: R$ 526.749,90
+RECEITA_BASE_5MIN = 526_749.9
+
+# *********************************************
+#  CONSTANTES — CUSTO FIXO
+ 
+CUSTO_LICENCA_MES  =  800.0   # R$ — SO (Ubuntu Pro) + monitoramento
+CUSTO_HARDWARE_MES = 1200.0  # R$ — amortização do hardware (~R$60k ÷ 60 meses)
+CUSTO_OPERACAO_MES =  500.0   # R$ — salário dos funcionários (rateio por servidor)
+
+INTERVALOS_MES = 30 * 24 * 12 
+
+# Custo fixo por servidor a cada 5 minutos
+CUSTO_FIXO_5MIN = (CUSTO_LICENCA_MES + CUSTO_HARDWARE_MES + CUSTO_OPERACAO_MES) / INTERVALOS_MES
+
+# *********************************************
+#  CONSTANTES — CUSTO VARIÁVEL (ENERGIA)
+
+POTENCIA_MIN_W = 150   # Watts — servidor ligado sem nenhuma carga
+POTENCIA_MAX_W = 500   # Watts — servidor a 100% de CPU + RAM + Disco
+TARIFA_KWH = 0.75      # R$/kWh — tarifa comercial media brasileira
+HORAS_5MIN = 5 / 60    # Duração do intervalo convertida em horas (= 0,0833h)
+ 
+# Pesos de cada recurso no consumo de energia
+PESO_CPU_ENERGIA   = 0.65
+PESO_RAM_ENERGIA   = 0.25
+PESO_DISCO_ENERGIA = 0.10
+
+# *********************************************
+#  FUNÇÃO: EstimarReceita
+
+def EstimarReceita(df):
+    receita = RECEITA_BASE_5MIN
+ 
+    latencia = float(df.get('LATENCIA',  0))
+    cpu      = float(df.get('CPU_PER',   0))
+    ram      = float(df.get('RAM_PER',   0))
+    disco    = float(df.get('DISCO_PER', 0))
+ 
+    # — Penalidades de latência —
+    if latencia > 500:
+        receita *= (1 - 0.25)    # −25%: falha de serviço
+    elif latencia > 200:
+        receita *= (1 - 0.12)    # −12%: abandono de sessão
+    elif latencia > 100:
+        receita *= (1 - 0.05)    # −5%: lentidão perceptível
+ 
+    # — Penalidades de CPU —
+    if cpu > 90:
+        receita *= (1 - 0.12)    # −12%: risco de queda
+    elif cpu > 85:
+        receita *= (1 - 0.05)    # −5%: sobrecarga
+    elif cpu < 15:
+        receita *= (1 - 0.02)    # −2%: servidor ocioso (capacidade desperdiçada)
+ 
+    # — Penalidades de RAM —
+    if ram > 95:
+        receita *= (1 - 0.15)    # −15%: crítico — possível falta de memória (OOM)
+    elif ram > 85:
+        receita *= (1 - 0.07)    # −7%: pressão de memória
+ 
+    # — Penalidades de Disco —
+    if disco > 95:
+        receita *= (1 - 0.10)    # −10%: disco cheio
+    elif disco > 85:
+        receita *= (1 - 0.04)    # −4%: I/O degradado
+ 
+    return round(receita, 2)
+
+def dashFinanceiro(dados):
+    if not dados:
+        print("ERRO: Sem dados para processar")
+        return
+    
+    df = pd.DataFrame(dados)
+
+    # Converte as colunas numéricas — o CSV pode usar vírgula como decimal
+    colunas_numericas = ['CPU_PER', 'RAM_PER', 'DISCO_PER', 'LATENCIA', 'PACOTES_ENV', 'PACOTES_RCB', 'PACOTES_PER']
+    
+    # troca vírgula por ponto
+    for coluna in colunas_numericas:
+        df[coluna] = (
+            df[coluna]
+            .astype(str)
+            .str.replace(',', '.', regex=False)  
+            .astype(float)
+        )
+    
+    df['DATE'] = pd.to_datetime(df['DATE'])
+    df['MES']  = df['DATE'].dt.to_period('M').astype(str)
+
+    # ── RECEITA ───────────────────────────────────────────────────
+    #
+    # A receita é global — não pertence a um servidor específico
+    # Por isso agrupa todos os servidores do mesmo instante (DATE)
+    # e calcula uma média de cada métrica para representar a infra toda
+    #
+    # Exemplo:
+    #   10:00  SRV-01  CPU 80%
+    #   10:00  SRV-02  CPU 40%
+    #   10:00  SRV-03  CPU 60%
+    #   ─────────────────────
+    #   MÉDIA: 10:00   CPU 60%  → entra na função EstimarReceita
+
+    #Agrupa
+    medias_por_tempo = (
+        df.groupby('DATE')[['LATENCIA', 'CPU_PER', 'RAM_PER', 'DISCO_PER']]
+        .mean()
+        .reset_index()
+    )
+ 
+    # Aplica EstimarReceita em cada linha de médias
+    # (cada linha representa um instante de 5 minutos)
+    medias_por_tempo['RECEITA_5MIN'] = medias_por_tempo.apply(
+        lambda row: EstimarReceita(row.to_dict()), axis=1
+    )
+ 
+    # Conta quantos servidores estavam ativos em cada instante
+    # para distribuir a receita proporcionalmente entre eles
+    contagem_por_tempo = df.groupby('DATE')['SERVIDOR'].count().reset_index()
+    contagem_por_tempo.columns = ['DATE', 'QTD_SERVIDORES']
+ 
+    # Junta a contagem com as médias e divide a receita por servidor
+    # Resultado:
+    #   DATE   | RECEITA_5MIN | QTD_SERVIDORES | RECEITA_POR_SERVIDOR
+    #   10:00  | R$ 98.958    |       3        |      R$ 32.986
+    medias_por_tempo = medias_por_tempo.merge(contagem_por_tempo, on='DATE')
+    medias_por_tempo['RECEITA_POR_SERVIDOR'] = (
+        medias_por_tempo['RECEITA_5MIN'] / medias_por_tempo['QTD_SERVIDORES']
+    )
+    
+    # RECEITA FEITAAAAAAAAAA VAMO BORAAAAAAA
+    
+    # ── CUSTO ─────────────────────────────────────────────────────
+    #
+    # O custo é calculado por servidor individualmente
+    # Cada servidor tem seu próprio CPU/RAM/Disco, logo cada um
+    # recebe um custo diferente no mesmo instante
+ 
+    cpu = df['CPU_PER'] / 100
+    ram = df['RAM_PER'] / 100
+    disco = df['DISCO_PER'] / 100
+ 
+    # Média ponderada da carga — representa o quanto o servidor está sendo exigido
+    fator_carga = (
+        (cpu   * PESO_CPU_ENERGIA)   +
+        (ram   * PESO_RAM_ENERGIA)   +
+        (disco * PESO_DISCO_ENERGIA)
+    )
+ 
+    potencia_w = POTENCIA_MIN_W + (POTENCIA_MAX_W - POTENCIA_MIN_W) * fator_carga
+    # Potência estimada de cada servidor nesse instante
+    # 150W |----[?W]----------| 500W
+    # ocioso                    máximo
+
+    energia_kwh = (potencia_w / 1000) * HORAS_5MIN
+    # Energia consumida no intervalo (em kWh)
+    # Fórmula: Energia (kWh) = Potência (kW) × Tempo (h)
+ 
+    # Aplica a tarifa e soma o custo fixo
+    custo_energia = energia_kwh * TARIFA_KWH
+    df['CUSTO_5MIN'] = (custo_energia + CUSTO_FIXO_5MIN).round(4)
+ 
+    # Junta a receita calculada de volta no DataFrame principal
+    df = df.merge(
+        medias_por_tempo[['DATE', 'RECEITA_5MIN', 'RECEITA_POR_SERVIDOR']],
+        on='DATE', how='left'
+    )
+    
+    # CUSTO FEITOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO 
+ 
+    print(df)
+    print("Colunas encontradas:", df.columns.tolist())
+    print("Primeira linha:", df.iloc[0].to_dict())
+    return {"tipo": "financeiro", "total_dados": len(dados)}
+
+
+
+
+
+
+
+#################################################################################################################################################
