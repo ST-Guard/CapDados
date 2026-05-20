@@ -10,7 +10,7 @@ s3 = boto3.client('s3')
 
 # Função inicial que chama as demais
 def lambda_handler(event, context):
-    print("Lambda Iniciada! 📍" )
+    print("Lambda Iniciada!" )
     print(f"Evento recebido: {event}")
 
     #Verifica se é o JSON de metricas
@@ -40,7 +40,7 @@ def lambda_handler(event, context):
                 "body": resultado_trusted
             }
     except Exception as e:
-        print(f"❌ Erro fatal: {e}")
+        print(f"Erro fatal: {e}")
         return {
             "statusCode": 500,
             "body": str(e)
@@ -419,8 +419,6 @@ def dashFinanceiro(dados):
 
 
 ####################################################################################################################################################################
-
-
 ##################################################### DASHBOARD ALERTAS ############################################################################################
 
 # JSON dashboard Alertas - Victor G
