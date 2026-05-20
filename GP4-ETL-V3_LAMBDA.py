@@ -168,12 +168,19 @@ def ClientGeral(bucket, chave):
 
     respFinanceiro = dashFinanceiro(dados_dicionario)
     respGestora = dashGestora(dados_dicionario)
+    respGestoraOp = dashOperacional(dados_dicionario, geral)
     respAnalista = dashAnalista(dados_dicionario)
     respServidores = dashServidores(dados_dicionario)
     # DASHBOARD ALERTAS  - Victor G
     respAlertasGestora = dashAlertasGestora(dados_dicionario, geral, bucket)
  
 
+
+    s3.put_object(
+        Bucket=bucket,
+        Key="client/gestoraOp_master.json",
+        Body=json.dumps(respGestoraOp, default=str, indent=4)
+    )
 
     s3.put_object(
         Bucket=bucket,
@@ -216,6 +223,7 @@ def ClientGeral(bucket, chave):
 # ZONA DE TRABALHO
 
 def dashGestora(dados):
+    
     return {"tipo": "gestora", "total_dados": len(dados)}
 
 def dashAnalista(dados):
@@ -351,15 +359,15 @@ def dashFinanceiro(dados):
     # Conta quantos servidores estavam ativos em cada instante
     # para distribuir a receita proporcionalmente entre eles
     contagem_por_tempo = df.groupby('DATE')['SERVIDOR'].count().reset_index()
-    contagem_por_tempo.columns = ['DATE', 'QTD_SERVIDORES']
+    contagem_por_tempo.columns = ['DATE', 'qntServidores']
  
     # Junta a contagem com as médias e divide a receita por servidor
     # Resultado:
-    #   DATE   | RECEITA_5MIN | QTD_SERVIDORES | RECEITA_POR_SERVIDOR
+    #   DATE   | RECEITA_5MIN | qntServidores | RECEITA_POR_SERVIDOR
     #   10:00  | R$ 98.958    |       3        |      R$ 32.986
     medias_por_tempo = medias_por_tempo.merge(contagem_por_tempo, on='DATE')
     medias_por_tempo['RECEITA_POR_SERVIDOR'] = (
-        medias_por_tempo['RECEITA_5MIN'] / medias_por_tempo['QTD_SERVIDORES']
+        medias_por_tempo['RECEITA_5MIN'] / medias_por_tempo['qntServidores']
     )
     
     # RECEITA FEITAAAAAAAAAA VAMO BORAAAAAAA
@@ -671,3 +679,423 @@ def dashAlertasGestora(dados, geral, bucket):
 
 
 #################################################################################################################################################
+###########################################################DASHBOARD OPERACIONAL GESTOR####################################################################
+
+
+#SCORE SAUDE SERVIDOR
+LIMITE_CPU = 80
+LIMITE_RAM = 85
+LIMITE_DISCO = 70    
+LIMITE_LATENCIA = 50
+
+def converter_float(valor, padrao=0.0):
+    try:
+        return float(str(valor).replace(",", "."))
+    except (ValueError, TypeError):
+        return padrao
+
+
+def calcularPenalidadePadrao(persistencia):
+    if persistencia < 0.20:
+        return 0
+    elif persistencia < 0.40:
+        return 5
+    elif persistencia < 0.60:
+        return 10
+    elif persistencia < 0.80:
+        return 15
+    return 20
+
+
+def calcularPenalidadeRam(persistencia):
+    if persistencia < 0.20:
+        return 0
+    elif persistencia < 0.40:
+        return 8
+    elif persistencia < 0.60:
+        return 15
+    elif persistencia < 0.80:
+        return 20
+    return 25
+
+
+def calcularPenalidadeDisco(persistencia):
+    if persistencia < 0.20:
+        return 0
+    elif persistencia < 0.40:
+        return 7
+    elif persistencia < 0.60:
+        return 12
+    elif persistencia < 0.80:
+        return 16
+    return 20
+
+
+def calcularPenalidadeLatencia(persistencia):
+    if persistencia < 0.20:
+        return 0
+    elif persistencia < 0.40:
+        return 3
+    elif persistencia < 0.60:
+        return 6
+    elif persistencia < 0.80:
+        return 8
+    return 10
+
+
+def calcularPenalidadeTendencia(queda):
+    if queda < 5:
+        return 0
+    elif queda < 10:
+        return 3
+    elif queda < 20:
+        return 6
+    return 10
+
+
+def classificarStatusScore(score):
+    if score >= 80:
+        return "Saudável"
+    elif score >= 60:
+        return "Atenção"
+    return "Crítico"
+
+
+def calcularScoreParcial(janela,limites):
+    qntCpuCritica = 0
+    qntRamCritica = 0
+    qntDiscoCritico = 0
+    qntLatCritica = 0
+    qntColetasProblematicas = 0
+
+    total_coletas = len(janela)
+
+    if total_coletas == 0:
+        return 100
+
+    limiteCpu = converter_float(limites.get("CPU"), LIMITE_CPU)
+    limiteRam = converter_float(limites.get("RAM"), LIMITE_RAM)
+    limiteDisco = converter_float(limites.get("DISCO"), LIMITE_DISCO)
+    limiteLatencia = converter_float(limites.get("REDE"), LIMITE_LATENCIA)
+
+    for coleta in janela:
+        cpu = converter_float(coleta.get("CPU_PER"))
+        ram = converter_float(coleta.get("RAM_PER"))
+        disco = converter_float(coleta.get("DISCO_PER"))
+        latencia = converter_float(coleta.get("LATENCIA"))
+
+        coletaProblematica = False
+
+        if cpu > limiteCpu:
+            qntCpuCritica += 1
+            coletaProblematica = True
+
+        if ram > limiteRam:
+            qntRamCritica += 1
+            coletaProblematica = True
+
+        if disco > limiteDisco:
+            qntDiscoCritico += 1
+            coletaProblematica = True
+
+        if latencia > limiteLatencia:
+            qntLatCritica += 1
+            coletaProblematica = True
+
+        if coletaProblematica:
+            qntColetasProblematicas += 1
+
+    persistenciaGeral = qntColetasProblematicas / total_coletas
+    persistenciaCpu = qntCpuCritica / total_coletas
+    persistenciaRam = qntRamCritica / total_coletas
+    persistenciaDisco = qntDiscoCritico / total_coletas
+    persistenciaLatencia = qntLatCritica / total_coletas
+
+    penalidadeGeral = calcularPenalidadePadrao(persistenciaGeral)
+    penalidadeCpu = calcularPenalidadePadrao(persistenciaCpu)
+    penalidadeRam = calcularPenalidadeRam(persistenciaRam)
+    penalidadeDisco = calcularPenalidadeDisco(persistenciaDisco)
+    penalidadeLatencia = calcularPenalidadeLatencia(persistenciaLatencia)
+
+    penalidadeComp = (
+        penalidadeCpu
+        + penalidadeRam
+        + penalidadeDisco
+        + penalidadeLatencia
+    )
+
+    score_parcial = 100 - penalidadeComp - penalidadeGeral
+
+    return max(0, min(100, score_parcial))
+
+
+def calcularScoreServidor(coletaServidor, limites):
+    if not coletaServidor:
+        return {
+            "score": 100,
+            "status": "Saudável",
+            "scoreParcialAtual": 100,
+            "scoreParcialAnterior": 100,
+            "queda": 0,
+            "penalidadeTendencia": 0
+        }
+
+    coletas_ordenadas = sorted(
+        coletaServidor,
+        key=lambda coleta: str(coleta.get("DATE", ""))
+    )
+
+    ultimas60Linhas = coletas_ordenadas[-60:]
+
+    janelaAnterior = ultimas60Linhas[-60:-30]
+    janelaAtual = ultimas60Linhas[-30:]
+
+    scoreParcialAnterior = calcularScoreParcial(janelaAnterior, limites)
+    scoreParcialAtual = calcularScoreParcial(janelaAtual, limites)
+
+    queda = scoreParcialAnterior - scoreParcialAtual
+
+    penalidadeTendencia = calcularPenalidadeTendencia(queda)
+
+    scoreFinal = scoreParcialAtual - penalidadeTendencia
+    scoreFinal = max(0, min(100, scoreFinal))
+
+    return {
+        "score": round(scoreFinal, 2),
+        "status": classificarStatusScore(scoreFinal),
+        "scoreParcialAtual": round(scoreParcialAtual, 2),
+        "scoreParcialAnterior": round(scoreParcialAnterior, 2),
+        "queda": round(queda, 2),
+        "penalidadeTendencia": penalidadeTendencia
+    }
+
+#SCORE SAUDE ZONA 
+
+def calcularScoreZona(servidoresZona):
+    total = len(servidoresZona)
+
+    if total == 0:
+        return {
+            "score": 100,
+            "status": "Saudável"
+        }
+
+    qntCriticos = 0
+    qntAtencao = 0
+    srvPiorScore = 100
+
+    for servidor in servidoresZona:
+        score = servidor["score"]
+        status = servidor["status"]
+
+        if status == "Crítico":
+            qntCriticos += 1
+        elif status == "Atenção":
+            qntAtencao += 1
+
+        if score < srvPiorScore:
+            srvPiorScore = score
+
+    percentCriticos = qntCriticos / total
+    percentAtencao = qntAtencao / total
+
+    if percentCriticos > 0.40:
+        penalidadeCritico = 40
+    elif percentCriticos > 0.25:
+        penalidadeCritico = 30
+    elif percentCriticos > 0.10:
+        penalidadeCritico = 20
+    elif percentCriticos > 0:
+        penalidadeCritico = 10
+    else:
+        penalidadeCritico = 0
+
+    if percentAtencao > 0.50:
+        penalidadeAtencao = 15
+    elif percentAtencao > 0.25:
+        penalidadeAtencao = 10
+    elif percentAtencao > 0:
+        penalidadeAtencao = 5
+    else:
+        penalidadeAtencao = 0
+
+    if srvPiorScore < 40:
+        penalidadePiorSrv = 15
+    elif srvPiorScore < 60:
+        penalidadePiorSrv = 10
+    elif srvPiorScore < 80:
+        penalidadePiorSrv = 5
+    else:
+        penalidadePiorSrv = 0
+
+    score_zona = 100 - penalidadeCritico - penalidadeAtencao - penalidadePiorSrv
+    score_zona = max(0, min(100, score_zona))
+
+    return {
+        "score": round(score_zona, 2),
+        "status": classificarStatusScore(score_zona),
+        "qntServidores": total,
+        "qntCriticos": qntCriticos,
+        "qntAtencao": qntAtencao,
+        "srvPiorScore": round(srvPiorScore, 2)
+    }
+
+#SCORE SAUDE DATACENTER 
+
+def calcularScoreDatacenter(zonas):
+    total = len(zonas)
+
+    if total == 0:
+        return {
+            "score": 100,
+            "status": "Saudável"
+        }
+
+    qntCriticos = 0
+    qntAtencao = 0
+    zonaPiorScore = 100
+
+    for zona in zonas:
+        score = zona["score"]
+        status = zona["status"]
+
+        if status == "Crítico":
+            qntCriticos += 1
+        elif status == "Atenção":
+            qntAtencao += 1
+
+        if score < zonaPiorScore:
+            zonaPiorScore = score
+
+    percentCriticos = qntCriticos / total
+    percentAtencao = qntAtencao / total
+
+    if percentCriticos > 0.50:
+        penalidadeCritico = 40
+    elif percentCriticos > 0.25:
+        penalidadeCritico = 25
+    elif percentCriticos > 0:
+        penalidadeCritico = 15
+    else:
+        penalidadeCritico = 0
+
+    if percentAtencao > 0.50:
+        penalidadeAtencao = 15
+    elif percentAtencao > 0:
+        penalidadeAtencao = 8
+    else:
+        penalidadeAtencao = 0
+
+    if zonaPiorScore < 40:
+        penalidadePiorZona = 20
+    elif zonaPiorScore < 60:
+        penalidadePiorZona = 12
+    elif zonaPiorScore < 80:
+        penalidadePiorZona = 6
+    else:
+        penalidadePiorZona = 0
+
+    score_datacenter = 100 - penalidadeCritico - penalidadeAtencao - penalidadePiorZona
+    score_datacenter = max(0, min(100, score_datacenter))
+
+    return {
+        "score": round(score_datacenter, 2),
+        "status": classificarStatusScore(score_datacenter),
+        "qntZonas": total,
+        "qntZonasCriticas": qntCriticos,
+        "qntZonasAtencao": qntAtencao,
+        "zonaPiorScore": round(zonaPiorScore, 2)
+    }
+
+def dashOperacional(dados,geral):
+    df = pd.DataFrame(dados)
+
+    if df.empty:
+        return {
+            "tipo": "gestora",
+            "total_dados": 0,
+            "datacenters": {}
+        }
+
+    df["DATE"] = pd.to_datetime(df["DATE"])
+
+    resultado = {}
+
+    for (empresa, datacenter), df_dc in df.groupby(["EMPRESA", "DATACENTER"]):
+
+        zonas = []
+        servidores_datacenter = []
+
+        for zona, df_zona in df_dc.groupby("ZONA"):
+
+            servidoresZona = []
+
+            for servidor, df_servidor in df_zona.groupby("SERVIDOR"):
+                try:
+                    info_servidor = geral[empresa][datacenter][zona][servidor]
+                    limites = info_servidor.get("limites", {})
+                except (KeyError, TypeError):
+                    limites = {}
+
+                df_servidor = df_servidor.sort_values("DATE")
+
+                coletaServidor = df_servidor.to_dict(orient="records")
+
+                resultadoScore = calcularScoreServidor(coletaServidor,limites)
+
+                servidor_obj = {
+                    "servidor": servidor,
+                    "zona": zona,
+                    "score": resultadoScore["score"],
+                    "status": resultadoScore["status"],
+                    "scoreParcialAtual": resultadoScore["scoreParcialAtual"],
+                    "scoreParcialAnterior": resultadoScore["scoreParcialAnterior"],
+                    "queda": resultadoScore["queda"],
+                    "penalidadeTendencia": resultadoScore["penalidadeTendencia"]
+                }
+
+                servidoresZona.append(servidor_obj)
+                servidores_datacenter.append(servidor_obj)
+
+            resultadoZona = calcularScoreZona(servidoresZona)
+
+            zona_obj = {
+                "zona": zona,
+                "score": resultadoZona["score"],
+                "status": resultadoZona["status"],
+                "qntServidores": resultadoZona["qntServidores"],
+                "qntCriticos": resultadoZona["qntCriticos"],
+                "qntAtencao": resultadoZona["qntAtencao"],
+                "srvPiorScore": resultadoZona["srvPiorScore"],
+                "servidores": servidoresZona
+            }
+
+            zonas.append(zona_obj)
+
+        resultadoDatacenter = calcularScoreDatacenter(zonas)
+
+        rankingSrvCriticosTop5 = sorted(
+            servidores_datacenter,
+            key=lambda servidor: servidor["score"]
+        )[:5]
+
+        resultado.setdefault(empresa, {})
+
+        resultado[empresa][datacenter] = {
+            "score": resultadoDatacenter["score"],
+            "status": resultadoDatacenter["status"],
+            "qntZonas": resultadoDatacenter["qntZonas"],
+            "qntZonasCriticas": resultadoDatacenter["qntZonasCriticas"],
+            "qntZonasAtencao": resultadoDatacenter["qntZonasAtencao"],
+            "zonaPiorScore": resultadoDatacenter["zonaPiorScore"],
+            "zonas": zonas,
+            "rankingSrvCriticosTop5": rankingSrvCriticosTop5
+        }
+
+    return {
+        "tipo": "gestora",
+        "total_dados": len(dados),
+        "datacenters": resultado
+    }
+
+###########################################################################################################################################################################
