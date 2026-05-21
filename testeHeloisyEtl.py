@@ -17,11 +17,6 @@ def lambda_handler(event, context):
     #Verifica se é o JSON de metricas
     registro = event["Records"][0]["s3"]
     key = unquote_plus(registro["object"]["key"])
-
-    if not key.startswith("raw/"):
-        print(f"Ignorando arquivo fora do raw/: {key}")
-        return
-
     if key.lower().endswith(".json"):
         return f"Arquivo JSON detectado ({key}). Processamento ignorado."
         
@@ -158,6 +153,7 @@ def ClientGeral(bucket, chave):
     
 
     # Le os arquivos do JSON feito pelo SAMU
+
     geral = {}
     try:
         resp_geral = s3.get_object(Bucket=bucket, Key="raw/geral.json")
@@ -288,8 +284,7 @@ def classificarStatusScore(score):
     return "Crítico"
 
 
-def calcularScoreParcial(janela, limites):
-
+def calcularScoreParcial(janela,limites):
     qntCpuCritica = 0
     qntRamCritica = 0
     qntDiscoCritico = 0
@@ -306,24 +301,11 @@ def calcularScoreParcial(janela, limites):
     limiteDisco = converter_float(limites.get("DISCO"), LIMITE_DISCO)
     limiteLatencia = converter_float(limites.get("REDE"), LIMITE_LATENCIA)
 
-    for indice, coleta in enumerate(janela):
-
+    for coleta in janela:
         cpu = converter_float(coleta.get("CPU_PER"))
         ram = converter_float(coleta.get("RAM_PER"))
         disco = converter_float(coleta.get("DISCO_PER"))
         latencia = converter_float(coleta.get("LATENCIA"))
-
-        if indice < 5:
-            print("VALORES COLETA:", {
-                "cpu": cpu,
-                "ram": ram,
-                "disco": disco,
-                "latencia": latencia,
-                "limiteCpu": limiteCpu,
-                "limiteRam": limiteRam,
-                "limiteDisco": limiteDisco,
-                "limiteLatencia": limiteLatencia
-            })
 
         coletaProblematica = False
 
@@ -366,24 +348,6 @@ def calcularScoreParcial(janela, limites):
     )
 
     score_parcial = 100 - penalidadeComp - penalidadeGeral
-
-    print("PERSISTÊNCIAS:", {
-        "persistenciaGeral": persistenciaGeral,
-        "persistenciaCpu": persistenciaCpu,
-        "persistenciaRam": persistenciaRam,
-        "persistenciaDisco": persistenciaDisco,
-        "persistenciaLatencia": persistenciaLatencia
-    })
-
-    print("PENALIDADES:", {
-        "penalidadeGeral": penalidadeGeral,
-        "penalidadeCpu": penalidadeCpu,
-        "penalidadeRam": penalidadeRam,
-        "penalidadeDisco": penalidadeDisco,
-        "penalidadeLatencia": penalidadeLatencia,
-        "penalidadeComp": penalidadeComp,
-        "scoreParcial": score_parcial
-    })
 
     return max(0, min(100, score_parcial))
 
