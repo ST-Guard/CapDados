@@ -15,7 +15,7 @@ import random
 
 
 arquivo_csv = "dados-brutos_maquina.csv"
-bucket_name = 'smartdatabucket1'
+bucket_name = 's3-testesmartheloisy'
 
 #STE12345
 #SRV-DC01-WEB-05
@@ -527,16 +527,19 @@ def capturaJson():
                 "estado": linha["estadoServidor"], 
                 "idServidor": linha["idServidor"],
                 "idDataCenter": linha["idDataCenter"],
-                "limites": {}, 
-                "funcionarios": []}
+                "limites": {},
+                "limiteIds": {},
+                "funcionarios": []
+            }
 
-        estruturaGeral[empresa][datacenter][zona][servidor]["limiteIds"][componente] = linha["idComponente"]
+    estruturaGeral[empresa][datacenter][zona][servidor]["limites"][componente] = linha["limite"]
+    estruturaGeral[empresa][datacenter][zona][servidor]["limiteIds"][componente] = linha["idComponente"]
         
-        if linha["nomeAnalista"] and linha["nomeAnalista"] not in [f["nome"] for f in estruturaGeral[empresa][datacenter][zona][servidor]["funcionarios"]]:
-            estruturaGeral[empresa][datacenter][zona][servidor]["funcionarios"].append({
-                "id": linha["idAnalista"],
-                "nome": linha["nomeAnalista"]
-            })
+    if linha["nomeAnalista"] and linha["nomeAnalista"] not in [f["nome"] for f in estruturaGeral[empresa][datacenter][zona][servidor]["funcionarios"]]:
+        estruturaGeral[empresa][datacenter][zona][servidor]["funcionarios"].append({
+            "id": linha["idAnalista"],
+            "nome": linha["nomeAnalista"]
+        })
 
     geral_json = json.dumps(estruturaGeral, ensure_ascii=False, indent=4, default=str)
 
