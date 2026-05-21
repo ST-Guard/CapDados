@@ -153,7 +153,6 @@ def ClientGeral(bucket, chave):
     
 
     # Le os arquivos do JSON feito pelo SAMU
-
     geral = {}
     try:
         resp_geral = s3.get_object(Bucket=bucket, Key="raw/geral.json")
