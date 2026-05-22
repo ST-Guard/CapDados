@@ -15,7 +15,7 @@ import random
 
 
 arquivo_csv = "dados-brutos_maquina.csv"
-bucket_name = 's3-testesmartheloisy'
+bucket_name = 'smartdatabucket2'
 
 #STE12345
 #SRV-DC01-WEB-05

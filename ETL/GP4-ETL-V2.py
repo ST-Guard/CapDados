@@ -11,7 +11,6 @@ s3 = boto3.client('s3')
 def lambda_handler(event, context):
 
     TrustedCsv(event, context)
-
     return {
         "statusCode": 200,
         "body": "GG"
