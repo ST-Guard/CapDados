@@ -151,7 +151,7 @@ def validarServidor():
     
 
     id_empresa = empresa[0][0]
-    nome_server = empresa[0][1]
+    
 
 
     print(empresa)    
@@ -163,7 +163,7 @@ def validarServidor():
         JOIN datacenter on fkDataCenter =  idDataCenter 
         JOIN regiao ON fkRegiaoDataCenter = fkDataCenter 
         JOIN empresa ON fkRegiaoEmpresa = idEmpresa 
-        WHERE idEmpresa = {id_empresa} AND s.nome = {nome_server};
+        WHERE idEmpresa = {id_empresa} AND s.nome = '{nome_servidor}';
     """)
 
     servidor = cursor.fetchall()
