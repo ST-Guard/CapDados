@@ -9,6 +9,9 @@ import io
 
 s3 = boto3.client('s3')
 
+
+
+
 # Função inicial que chama as demais
 def lambda_handler(event, context):
     print("Lambda Iniciada!" )

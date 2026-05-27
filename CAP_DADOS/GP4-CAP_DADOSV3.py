@@ -73,6 +73,26 @@ def upload_file(file_name, bucket, object_name=None):
     return True
 
 
+
+
+TOTAL_SERVIDORES_STEAM = 10000
+def buscarJogadoresAtivos():
+    STEAM_APP_ID           = 730
+    STEAM_API_URL          = f"https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?appid={STEAM_APP_ID}"
+
+    FALLBACK_JOGADORES = 700000
+    try:
+        resposta  = requests.get(STEAM_API_URL, timeout=5)
+        dados = resposta.json()
+        jogadores = int(dados["response"]["player_count"])
+        print(f"API Steam: {jogadores:,} jogadores ativos (AppID {STEAM_APP_ID})")
+        return jogadores
+    except Exception as e:
+        print(f"[AVISO] Falha na API Steam: {e}. Usando fallback: {FALLBACK_JOGADORES:,}")
+        return FALLBACK_JOGADORES 
+
+
+
 #------------------------------------------------------------------------------------------------------------------
 #FUNÇÕES DA SIMULAÇÃO
 
@@ -331,6 +351,12 @@ def capturaCSV(servidor):
         while len(top_ram) < 3:
             top_ram.append({'nome': 'N/A', 'cpu': 0, 'memoria': 0})
 
+        # API Steam 
+        jogadores_globais  = buscarJogadoresAtivos()
+        jogadores_nossos = jogadores_globais * 0.3
+
+
+
         print()
         dados_dict = {
             'EMPRESA': f'{servidor[0][16]}',
@@ -367,7 +393,8 @@ def capturaCSV(servidor):
             'USO_SISTEM': uso_sistema,
             'BOOTTIME': bootime,
             'DATA_HORA': tempo_agora,
-            'DIA_SEMANA': dia_semana
+            'DIA_SEMANA': dia_semana,
+            'JOGADORES_ATIVOS': jogadores_nossos
         }
 
         print(f"""
@@ -418,7 +445,9 @@ def capturaCSV(servidor):
             2° {top_ram[1]['nome']} -> {top_ram[1]['memoria']}
             3° {top_ram[2]['nome']} -> {top_ram[2]['memoria']}
 
-            ----------------------------------------------------
+            -------------------JOGADORES STEAM (API)------------------------------
+
+            JOGADORES ATIVOS: {jogadores_nossos} 
         """)
 
         CSV_DIC_WRITER.writerow(dados_dict)
