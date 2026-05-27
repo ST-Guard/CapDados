@@ -171,7 +171,7 @@ def capturaCSV(servidor):
     arquivo_csv = f"dados-brutos-{servidor[0][1]}.csv"
     
 
-    with open(arquivo_csv, 'a', newline='') as csvfile:
+    with open(arquivo_csv, 'w', newline='') as csvfile:
         colunas = ['EMPRESA', 'REGIAO', 'DATACENTER', 'ZONA', 'SERVIDOR', 'CPU', 'RAM_TOTAL', 'RAM_USADA', 'RAM_PERCENT',
                    'DISCO_TOTAL', 'DISCO_USADO', 'DISCO_PERCENT', 'LATENCIA', 'PACOTES_ENVIADOS', 'PACOTES_RECEBIDOS', 'PACOTES_PERDIDOS',
                    'QTD_PR', 'PROCESSO1_CPU', 'PORCENTAGEM_PROCESSO1_CPU', 'PROCESSO2_CPU', 'PORCENTAGEM_PROCESSO2_CPU', 'PROCESSO3_CPU', 'PORCENTAGEM_PROCESSO3_CPU',

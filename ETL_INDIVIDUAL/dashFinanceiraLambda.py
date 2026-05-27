@@ -21,7 +21,7 @@ def lambda_handler(event, context):
      
         resultado = dashFinanceiro(event, context)
         
-        if isinstance(resultado, dict) in resultado:
+        if isinstance(resultado, dict) and "KPIS" in resultado:
             chave_destino_json = "client/dashboard_financeiro.json"
             print(f"Salvando o Dashboard Financeiro em: {chave_destino_json}")
             s3.put_object(
@@ -31,13 +31,13 @@ def lambda_handler(event, context):
                 ContentType='application/json'
             )
 
-            print(f"Sucesso: {resultado['mensagem']} 🟩")
+            print(f"Sucesso: Dashboard Financeiro gerado e gravado no S3! 🟩")
             return {
                 "statusCode": 200,
-                "body": json.dumps(resultado)
+                "body": json.dumps({"status": "Sucesso", "chave": chave_destino_json})
             }
         else:
-            print(f"Aviso: {resultado}")
+            print(f"Aviso 🟥: {resultado}")
             return {"statusCode": 200, "body": str(resultado)}
 
     except Exception as e:
@@ -116,7 +116,12 @@ def dashFinanceiro(event, context):
     # Ler o arquivo CSV direto da memória 
     resposta = s3.get_object(Bucket=bucket, Key=key)
     conteudo = resposta['Body'].read().decode('utf-8-sig')
-    df = pd.read_csv(io.StringIO(conteudo), delimiter=";")
+    colunas_financeiras = [
+        'DATE', 'EMPRESA', 'REGIAO', 'DATACENTER', 'ZONA', 'SERVIDOR',
+        'CPU_PER', 'RAM_PER', 'DISCO_PER', 'LATENCIA',
+        'PACOTES_ENV', 'PACOTES_RCB', 'JOGADORES_ATIVOS'
+    ]
+    df = pd.read_csv(io.StringIO(conteudo), delimiter=";", usecols=colunas_financeiras)
     
     if df is None or len(df) == 0:
         return "ERRO: Sem dados para processar"
@@ -130,7 +135,8 @@ def dashFinanceiro(event, context):
         if coluna in df.columns:
             df[coluna] = pd.to_numeric(df[coluna], errors='coerce').fillna(0)
 
-    df['DATE'] = pd.to_datetime(df['DATE'])
+    df['DATE'] = pd.to_datetime(df['DATE'], errors='coerce')
+    df = df.dropna(subset=['DATE'])
     df['MES'] = df['DATE'].dt.to_period('M').astype(str)
     df['DATE_5MIN'] = df['DATE'].dt.floor('5min')
 
@@ -247,26 +253,26 @@ def dashFinanceiro(event, context):
     # ── KPIs mês corrente ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     mes_corrente = df_financeiro['MES'].max()
     df_mes_corr = df_financeiro[df_financeiro['MES'] == mes_corrente]
-    receita_corrente = round(df_mes_corr['RECEITA_5MIN'].sum(), 2)
-    custo_corrente = round(df_mes_corr['CUSTO_5MIN'].sum(),   2)
-    lucro_corrente = round(receita_corrente - custo_corrente, 2)
-    roi_corrente = round(((receita_corrente - custo_corrente) / custo_corrente) * 100, 2) if custo_corrente else 0.0
+    receita_corrente = float(round(df_mes_corr['RECEITA_5MIN'].sum(), 2))
+    custo_corrente   = float(round(df_mes_corr['CUSTO_5MIN'].sum(),   2))
+    lucro_corrente   = float(round(receita_corrente - custo_corrente, 2))
+    roi_corrente     = float(round(((receita_corrente - custo_corrente) / custo_corrente) * 100, 2)) if custo_corrente else 0.0
 
     # ── KPIs mês anterior ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     mes_anterior = (pd.Period(mes_corrente, 'M') - 1).strftime('%Y-%m')
     df_mes_ant = df_financeiro[df_financeiro['MES'] == mes_anterior]
-    receita_anterior = round(df_mes_ant['RECEITA_5MIN'].sum(), 2) if not df_mes_ant.empty else 0.0
-    custo_anterior = round(df_mes_ant['CUSTO_5MIN'].sum(),   2) if not df_mes_ant.empty else 0.0
-    roi_anterior = round(((receita_anterior - custo_anterior) / custo_anterior) * 100, 2) if custo_anterior else 0.0
+    receita_anterior = float(round(df_mes_ant['RECEITA_5MIN'].sum(), 2)) if not df_mes_ant.empty else 0.0
+    custo_anterior   = float(round(df_mes_ant['CUSTO_5MIN'].sum(),   2)) if not df_mes_ant.empty else 0.0
+    roi_anterior     = float(round(((receita_anterior - custo_anterior) / custo_anterior) * 100, 2)) if custo_anterior else 0.0
 
     # ── Deltas ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    delta_custo = round(custo_corrente   - custo_anterior,   2)
-    delta_receita = round(receita_corrente - receita_anterior, 2)
-    delta_roi = round(roi_corrente     - roi_anterior,     2)
+    delta_custo   = float(round(custo_corrente   - custo_anterior,   2))
+    delta_receita = float(round(receita_corrente - receita_anterior, 2))
+    delta_roi     = float(round(roi_corrente     - roi_anterior,     2))
 
     #*************************************************************
     #   REGRESSÃO TEMPORAL 
-    #*************************************************************
+
     historico_mensal = (
         df_financeiro.groupby('MES')
         .agg(
@@ -279,7 +285,7 @@ def dashFinanceiro(event, context):
         .sort_values('MES')  
     )
 
-    print(historico_mensal.head())
+   
     # Normalizador: Projeta meses quebrados (como o primeiro de 6 dias) para 30 dias - PRO-RATA
     INTERVALOS_PADRAO = 30 * 24 * 12 # 8640 intervalos de 5 min
     historico_mensal['CUSTO_MES'] = historico_mensal['CUSTO_MES'] * (INTERVALOS_PADRAO / historico_mensal['QTD_INTERVALOS'])
@@ -287,8 +293,8 @@ def dashFinanceiro(event, context):
 
     treino = historico_mensal[historico_mensal['MES'] < mes_corrente]
 
-    lista_custo = treino['CUSTO_MES'].tolist()
-    lista_receita = treino['RECEITA_MES'].tolist()
+    lista_custo = [float(x) for x in treino['CUSTO_MES'].tolist()]
+    lista_receita = [float(x) for x in treino['RECEITA_MES'].tolist()]
     n_meses = len(lista_custo)
 
     # Regressão Temporal: Tempo -> Custo / Receita
@@ -297,24 +303,27 @@ def dashFinanceiro(event, context):
 
     # Métricas de qualidade
     xs = list(range(1, n_meses + 1))
-    r2_custo  = calcularR2(xs,  lista_custo,   modelo_custo)
-    mae_custo = calcularMAE(xs, lista_custo,   modelo_custo)
-    r2_rec    = calcularR2(xs,  lista_receita, modelo_receita)
+    r2_custo  = float(calcularR2(xs,  lista_custo,   modelo_custo)) if modelo_custo else None
+    mae_custo = float(calcularMAE(xs, lista_custo,   modelo_custo)) if modelo_custo else None
+    r2_rec    = float(calcularR2(xs,  lista_receita, modelo_receita)) if modelo_receita else None
 
     # Projeção do próximo mês (x = n_meses + 1)
     x_prox = n_meses + 1
-    custo_previsto = forecastLinear(modelo_custo,   x_prox) if modelo_custo else None
-    receita_prevista = forecastLinear(modelo_receita, x_prox) if modelo_receita else None
+    custo_previsto = float(forecastLinear(modelo_custo,   x_prox)) if modelo_custo else None
+    receita_prevista = float(forecastLinear(modelo_receita, x_prox)) if modelo_receita else None
     #Intervalo de Confiança de 95%
-    ic_95 = round(1.96 * modelo_custo["MargemErro"], 2) if modelo_custo else None
+    ic_95 = float(round(1.96 * modelo_custo["MargemErro"], 2)) if modelo_custo else None
+  
 
     roi_previsto = None
     if custo_previsto and receita_prevista and custo_previsto > 0:
-        roi_previsto = round(((receita_prevista - custo_previsto) / custo_previsto) * 100, 2)
+        roi_previsto = float(round(((receita_prevista - custo_previsto) / custo_previsto) * 100, 2))
 
     print("ROI : ", roi_corrente)
     print("R² Custo : ", r2_custo)
     print("R² Receita : ", r2_rec)
+
+
 
     return {
         "KPIS": {
@@ -344,18 +353,18 @@ def dashFinanceiro(event, context):
         },
         "MODELO": {
             "N_MESES_HISTORICO": n_meses,
-            "R2_CUSTO":          r2_custo,
-            "MAE_CUSTO":         mae_custo,
-            "R2_RECEITA":        r2_rec,
-            "COEFI_ANGULAR_CUSTO":       round(modelo_custo["CoeficienteAngular"],   2) if modelo_custo   else None,
-            "COEFI_ANGULAR_RECEITA":     round(modelo_receita["CoeficienteAngular"], 2) if modelo_receita else None,
+            "R2_CUSTO":  r2_custo,
+            "MAE_CUSTO": mae_custo,
+            "R2_RECEITA": r2_rec,
+            "COEFI_ANGULAR_CUSTO": float(round(modelo_custo["CoeficienteAngular"],   2)) if modelo_custo   else None,
+            "COEFI_ANGULAR_RECEITA": float(round(modelo_receita["CoeficienteAngular"], 2)) if modelo_receita else None,
         },
         "HISTORICO_MENSAL": [
             {
                 "mes":     row["MES"],
-                "custo":   round(row["CUSTO_MES"],   2),
-                "receita": round(row["RECEITA_MES"], 2),
-                "roi":     round(((row["RECEITA_MES"] - row["CUSTO_MES"]) / row["CUSTO_MES"]) * 100, 2)
+                "custo":  float(round(row["CUSTO_MES"],   2)),
+                "receita": float(round(row["RECEITA_MES"], 2)),
+                "roi": float(round(((row["RECEITA_MES"] - row["CUSTO_MES"]) / row["CUSTO_MES"]) * 100, 2))
                            if row["CUSTO_MES"] > 0 else 0.0
             }
             for _, row in historico_mensal.iterrows()

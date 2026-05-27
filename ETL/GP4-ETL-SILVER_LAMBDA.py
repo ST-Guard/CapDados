@@ -4,6 +4,7 @@ import boto3
 from urllib.parse import unquote_plus
 from datetime import datetime, timedelta
 import pandas as pd
+import botocore
 import io
 
 s3 = boto3.client('s3')
@@ -150,10 +151,11 @@ def TrustedCsv(event, context):
         df_filtrado.to_csv(caminho_local_mestre, mode='a', header=False, index=False, sep=";", encoding="utf-8-sig")
         print("Linha adicionada ao mestre existente.")
         
-    except s3.exceptions.ClientError as e:
-        
-        if e.response['Error']['Code'] == "404":
+    except botocore.exceptions.ClientError as e:
+        error_code = e.response['Error']['Code']
+        if error_code == "404" or error_code == "NoSuchKey":
             print("Arquivo mestre inexistente. Será criado o primeiro registro.")
+            # Cria o arquivo do zero (Write)
             df_filtrado.to_csv(caminho_local_mestre, mode='w', header=True, index=False, sep=";", encoding="utf-8-sig")
         else:
             print(f"Erro inesperado ao buscar mestre: {e}")
