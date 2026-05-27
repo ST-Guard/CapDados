@@ -354,7 +354,7 @@ def capturaCSV(servidor):
 
         # API Steam 
         jogadores_globais  = buscarJogadoresAtivos()
-        jogadores_nossos = jogadores_globais * 0.3
+        jogadores_nossos = round(jogadores_globais * 0.3, 2)
 
 
 
