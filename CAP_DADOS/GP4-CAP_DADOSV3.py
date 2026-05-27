@@ -6,6 +6,7 @@ import time
 import speedtest
 import boto3 
 import os
+import requests
 import mysql.connector
 from dotenv import load_dotenv
 import random
@@ -77,8 +78,8 @@ def upload_file(file_name, bucket, object_name=None):
 
 TOTAL_SERVIDORES_STEAM = 10000
 def buscarJogadoresAtivos():
-    STEAM_APP_ID           = 730
-    STEAM_API_URL          = f"https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?appid={STEAM_APP_ID}"
+    STEAM_APP_ID = 730
+    STEAM_API_URL = f"https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?appid={STEAM_APP_ID}"
 
     FALLBACK_JOGADORES = 700000
     try:
