@@ -154,9 +154,9 @@ def validarServidor():
     
 
 
-    print(empresa)    
 
-    print(id_empresa)
+
+
     cursor.execute(f"""
         select * from servidor  s 
         JOIN zona on s.fkZona = idZOna 
@@ -167,7 +167,7 @@ def validarServidor():
     """)
 
     servidor = cursor.fetchall()
-    print(servidor)
+
     if len(servidor) == 0:
         print("SERVIDOR NÃO É VALIDO")
         return None
