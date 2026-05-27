@@ -16,7 +16,7 @@ import random
 
 
 arquivo_csv = "dados-brutos_maquina.csv"
-bucket_name = 'smartdatabucket2'
+bucket_name = 'datalake-smartdata2'
 
 #STE12345
 #SRV-DC01-WEB-05
@@ -33,7 +33,7 @@ print("""\033[33m
 
 \033[m""")
 
-load_dotenv(".env.dev")
+load_dotenv()
 
 chave_acesso = os.getenv('aws_access_key_id')
 chave_secreta = os.getenv('aws_secret_access_key')
@@ -147,18 +147,27 @@ def validarServidor():
 
     nome_servidor = input("Digite o nome do servidor: ")
 
-    cursor.execute("""
-        SELECT *
-        FROM servidor AS s
-        JOIN zona ON s.fkZona = idZona
-        JOIN regiao ON fkRegiaoDatacenter = fkDataCenter
-        JOIN empresa ON fkRegiaoEmpresa = idEmpresa
-        JOIN datacenter ON fkRegiaoDatacenter = idDatacenter
-        WHERE idEmpresa = %s AND s.nome = %s
-    """, (empresa[0][0], nome_servidor))
+
+    
+
+    id_empresa = empresa[0][0]
+    nome_server = empresa[0][1]
+
+
+    print(empresa)    
+
+    print(id_empresa)
+    cursor.execute(f"""
+        select * from servidor  s 
+        JOIN zona on s.fkZona = idZOna 
+        JOIN datacenter on fkDataCenter =  idDataCenter 
+        JOIN regiao ON fkRegiaoDataCenter = fkDataCenter 
+        JOIN empresa ON fkRegiaoEmpresa = idEmpresa 
+        WHERE idEmpresa = {id_empresa} AND s.nome = {nome_server};
+    """)
 
     servidor = cursor.fetchall()
-
+    print(servidor)
     if len(servidor) == 0:
         print("SERVIDOR NÃO É VALIDO")
         return None
