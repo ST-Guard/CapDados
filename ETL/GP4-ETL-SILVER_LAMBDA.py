@@ -60,21 +60,48 @@ def TrustedCsv(event, context):
     s3.download_file(bucket, key, caminho_local_entrada)
 
     mapeamento_colunas = {
-        'EMPRESA': 'EMPRESA', 'REGIAO': 'REGIAO', 'DATACENTER': 'DATACENTER', 'ZONA': 'ZONA', 'SERVIDOR': 'SERVIDOR',
-        'CPU': 'CPU_PER', 'QTD_NUCLEOS': 'QTD_NUCLEOS', 'RAM_TOTAL': 'RAM_TOTAL', 'RAM_USADA': 'RAM_USADO',
-        'RAM_PERCENT': 'RAM_PER', 'DISCO_TOTAL': 'DISCO_TOTAL', 'DISCO_USADO': 'DISCO_USADO', 'DISCO_PERCENT': 'DISCO_PER',
-        'LATENCIA': 'LATENCIA', 'PACOTES_ENVIADOS': 'PACOTES_ENV', 'PACOTES_RECEBIDOS': 'PACOTES_RCB', 'PACOTES_PERDIDOS': 'PACOTES_PER',
-        'QTD_PR': 'QTR_PR', 'USO_USER': 'USO_USER', 'USO_SISTEM': 'USO_SISTEM',
-        'PROCESSO1_CPU': 'PROCESSO01_CPU_N', 'PORCENTAGEM_PROCESSO1_CPU': 'PROCESSO1_CPU_P',
-        'PROCESSO2_CPU': 'PROCESSO2_CPU_N', 'PORCENTAGEM_PROCESSO2_CPU': 'PROCESSO2_CPU_P',
-        'PROCESSO3_CPU': 'PROCESSO3_CPU_N', 'PORCENTAGEM_PROCESSO3_CPU': 'PROCESSO3_CPU_P',
-        'PROCESSO1_RAM': 'PROCESSO01_RAM_N', 'PROCESSO1_RAM_GB': 'PROCESSO1_RAM_T', 'PROCESSO1_RAM_PERC': 'PROCESSO1_RAM_P',
-        'PROCESSO2_RAM': 'PROCESSO2_RAM_N', 'PROCESSO2_RAM_GB': 'PROCESSO2_RAM_T', 'PROCESSO2_RAM_PERC': 'PROCESSO2_RAM_P',
-        'PROCESSO3_RAM': 'PROCESSO3_RAM_N', 'PROCESSO3_RAM_GB': 'PROCESSO3_RAM_T', 'PROCESSO3_RAM_PERC': 'PROCESSO3_RAM_P',
-        'BOOTTIME_DT': 'BOOTTIME', 'DATA_HORA': 'DATE', 'UPTIME': 'UPTIME', 'HORA_TRATAMENTO': 'HORA_TRATAMENTO', 'DIA_SEMANA': 'DIA_SEMANA',
-        'JOGADORES_ATIVOS': 'JOGADORES_ATIVOS' 
+        'EMPRESA': 'EMPRESA', 
+        'REGIAO': 'REGIAO', 
+        'DATACENTER': 'DATACENTER', 
+        'ZONA': 'ZONA', 
+        'SERVIDOR': 'SERVIDOR',
+        'CPU': 'CPU_PER', 
+        'QTD_NUCLEOS': 'QTD_NUCLEOS', 
+        'RAM_TOTAL': 'RAM_TOTAL', 
+        'RAM_USADA': 'RAM_USADO',
+        'RAM_PERCENT': 'RAM_PER', 
+        'DISCO_TOTAL': 'DISCO_TOTAL', 
+        'DISCO_USADO': 'DISCO_USADO', 
+        'DISCO_PERCENT': 'DISCO_PER',
+        'LATENCIA': 'LATENCIA', 
+        'PACOTES_ENVIADOS': 'PACOTES_ENV', 
+        'PACOTES_RECEBIDOS': 'PACOTES_RCB', 
+        'PACOTES_PERDIDOS': 'PACOTES_PER',
+        'QTD_PR': 'QTR_PR', 
+        'JOGADORES_ATIVOS': 'JOGADORES_ATIVOS', 
+        'USO_USER': 'USO_USER', 
+        'USO_SISTEM': 'USO_SISTEM',
+        'PROCESSO1_CPU': 'PROCESSO01_CPU_N', 
+        'PORCENTAGEM_PROCESSO1_CPU': 'PROCESSO1_CPU_P',
+        'PROCESSO2_CPU': 'PROCESSO2_CPU_N', 
+        'PORCENTAGEM_PROCESSO2_CPU': 'PROCESSO2_CPU_P',
+        'PROCESSO3_CPU': 'PROCESSO3_CPU_N', 
+        'PORCENTAGEM_PROCESSO3_CPU': 'PROCESSO3_CPU_P',
+        'PROCESSO1_RAM': 'PROCESSO01_RAM_N', 
+        'PROCESSO1_RAM_GB': 'PROCESSO1_RAM_T', 
+        'PROCESSO1_RAM_PERC': 'PROCESSO1_RAM_P',
+        'PROCESSO2_RAM': 'PROCESSO2_RAM_N', 
+        'PROCESSO2_RAM_GB': 'PROCESSO2_RAM_T', 
+        'PROCESSO2_RAM_PERC': 'PROCESSO2_RAM_P',
+        'PROCESSO3_RAM': 'PROCESSO3_RAM_N', 
+        'PROCESSO3_RAM_GB': 'PROCESSO3_RAM_T', 
+        'PROCESSO3_RAM_PERC': 'PROCESSO3_RAM_P',
+        'BOOTTIME_DT': 'BOOTTIME', 
+        'DATA_HORA': 'DATE', 
+        'UPTIME': 'UPTIME', 
+        'HORA_TRATAMENTO': 'HORA_TRATAMENTO', 
+        'DIA_SEMANA': 'DIA_SEMANA'
     }
-
     # Leitura do CSV
     df = pd.read_csv(caminho_local_entrada, delimiter=";", encoding="utf-8-sig")
     df.columns = df.columns.str.strip()
@@ -115,27 +142,29 @@ def TrustedCsv(event, context):
     colunas_disponiveis = [col for col in mapeamento_colunas.keys() if col in df.columns]
     df_filtrado = df[colunas_disponiveis].rename(columns=mapeamento_colunas)
 
-    df_mestre = pd.DataFrame()
+
     try:
-        print(f"Buscando arquivo mestre: {chave_destino_mestre}")
-        resposta_mestre = s3.get_object(Bucket=bucket, Key=chave_destino_mestre)
-        conteudo_mestre = resposta_mestre['Body'].read().decode('utf-8')
-        df_mestre = pd.read_csv(io.StringIO(conteudo_mestre), delimiter=";")
-        print(f"Arquivo mestre carregado. Linhas: {len(df_mestre)}")
-    except s3.exceptions.NoSuchKey:
-        print("Arquivo mestre inexistente. Será criado o primeiro registro.")
-    except Exception as em:
-        print(f"Aviso ao ler mestre (criando novo): {em}")
+        print(f"Baixando arquivo mestre: {chave_destino_mestre}")
+        s3.download_file(bucket, chave_destino_mestre, caminho_local_mestre)
+        
+        df_filtrado.to_csv(caminho_local_mestre, mode='a', header=False, index=False, sep=";", encoding="utf-8-sig")
+        print("Linha adicionada ao mestre existente.")
+        
+    except s3.exceptions.ClientError as e:
+        
+        if e.response['Error']['Code'] == "404":
+            print("Arquivo mestre inexistente. Será criado o primeiro registro.")
+            df_filtrado.to_csv(caminho_local_mestre, mode='w', header=True, index=False, sep=";", encoding="utf-8-sig")
+        else:
+            print(f"Erro inesperado ao buscar mestre: {e}")
+            raise e
 
-    df_unificado = pd.concat([df_mestre, df_filtrado], ignore_index=True)
     
-    df_unificado.to_csv(caminho_local_mestre, sep=";", index=False, encoding="utf-8-sig")
-
     print(f"Efetuando upload para o S3 destino: {chave_destino_mestre}")
     s3.upload_file(caminho_local_mestre, bucket, chave_destino_mestre)
 
     return {
-        "mensagem": f"Dados tratados com sucesso! 🟩 Novas linhas: {len(df_filtrado)}. Total mestre: {len(df_unificado)}",
+        "mensagem": f"Dados tratados com sucesso! 🟩 ",
         "bucket": bucket,
         "chave": chave_destino_mestre
     }
