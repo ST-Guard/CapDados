@@ -6,7 +6,6 @@ import numpy as np
 from urllib.parse import unquote_plus
 from datetime import datetime
 
-
 s3 = boto3.client('s3')
 
 def lambda_handler(event, context):
@@ -18,7 +17,7 @@ def lambda_handler(event, context):
         if key.lower().endswith(".json"):
             return {"statusCode": 200, "body": f"Arquivo JSON ignorado: {key}"}
         
-     
+        
         resultado = dashFinanceiro(event, context)
         
         if isinstance(resultado, dict) and "KPIS" in resultado:
@@ -323,7 +322,80 @@ def dashFinanceiro(event, context):
     print("R² Custo : ", r2_custo)
     print("R² Receita : ", r2_rec)
 
-
+    # ── GRÁFICO DONUT — Distribuição de custos por categoria (mês corrente) ──
+    energia_mes = float(round(df_mes_corr.merge(
+        df[['DATE_5MIN', 'SERVIDOR']].assign(
+            ENERGIA = (((POTENCIA_MIN_W + (POTENCIA_MAX_W - POTENCIA_MIN_W) *
+                ((df['CPU_PER']/100 * PESO_CPU_ENERGIA) + 
+                 (df['RAM_PER']/100 * PESO_RAM_ENERGIA) + 
+                 (df['DISCO_PER']/100 * PESO_DISCO_ENERGIA))) / 1000) * (5/60) * TARIFA_KWH)
+        ), on='DATE_5MIN', how='left')['ENERGIA'].sum(), 2))
+    
+    intervalos_mes_corr = len(df_mes_corr)
+    rede_mes = float(round(custo_corrente - (CUSTO_GLOBAL_5MIN * intervalos_mes_corr) - 
+                     (df_mes_corr['QTD_SERVIDORES'].mean() * CUSTO_HW_5MIN * intervalos_mes_corr) - 
+                     energia_mes, 2))
+    hardware_mes = float(round(df_mes_corr['QTD_SERVIDORES'].mean() * CUSTO_HW_5MIN * intervalos_mes_corr, 2))
+    global_mes = float(round(CUSTO_GLOBAL_5MIN * intervalos_mes_corr, 2))
+    
+    donut_custos = {
+        "energia":  energia_mes,
+        "rede":     rede_mes,
+        "hardware": hardware_mes,
+        "fixo_global": global_mes
+    }
+    
+    # ── GRÁFICO BARRAS — Custo por datacenter e zona (mês corrente) ──
+    df_mes_completo = df[df['MES'] == mes_corrente].copy()
+    df_mes_completo['CUSTO_VAR'] = (
+        ((POTENCIA_MIN_W + (POTENCIA_MAX_W - POTENCIA_MIN_W) *
+          ((df_mes_completo['CPU_PER']/100 * PESO_CPU_ENERGIA) +
+           (df_mes_completo['RAM_PER']/100 * PESO_RAM_ENERGIA) +
+           (df_mes_completo['DISCO_PER']/100 * PESO_DISCO_ENERGIA))) / 1000) * (5/60) * TARIFA_KWH
+        + (df_mes_completo['PACOTES_ENV'] + df_mes_completo['PACOTES_RCB']) * CUSTO_BANDA_POR_PACOTE
+    )
+    
+    barras_datacenter = (
+        df_mes_completo.groupby(['DATACENTER', 'ZONA'])['CUSTO_VAR']
+        .sum().reset_index()
+        .rename(columns={'CUSTO_VAR': 'custo'})
+        .assign(custo=lambda x: x['custo'].round(2))
+        .to_dict(orient='records')
+    )
+    
+    # ── TABELA — Top servidores por custo (mês corrente) ──
+    custo_total_var = df_mes_completo.groupby('SERVIDOR')['CUSTO_VAR'].sum()
+    top_servidores = (
+        custo_total_var
+        .reset_index()
+        .rename(columns={'CUSTO_VAR': 'custo'})
+        .assign(
+            custo       = lambda x: x['custo'].round(2),
+            percentual  = lambda x: (x['custo'] / x['custo'].sum() * 100).round(1)
+        )
+        .sort_values('custo', ascending=False)
+        .to_dict(orient='records')
+    )
+    
+    # ── CARDS PREDITIVOS — Projeção de 12 meses futuros ──
+    periodo_base = pd.Period(mes_corrente, 'M')
+    projecoes = []
+    for i in range(1, 13):
+        x_i        = n_meses + i
+        c_prev     = float(forecastLinear(modelo_custo,   x_i)) if modelo_custo   else None
+        r_prev     = float(forecastLinear(modelo_receita, x_i)) if modelo_receita else None
+        orc        = float(round(c_prev * (1 + MARGEM_ORCAMENTO), 2)) if c_prev else None
+        roi_p      = float(round(((r_prev - c_prev) / c_prev) * 100, 2)) if (c_prev and r_prev and c_prev > 0) else None
+        confianca  = max(50, round((r2_custo or 0) * 100 * (1 - i * 0.03)))
+        projecoes.append({
+            "mes":              str(periodo_base + i),
+            "custo_previsto":   c_prev,
+            "receita_prevista": r_prev,
+            "orcamento":        orc,
+            "roi_previsto":     roi_p,
+            "ic_95":            ic_95,
+            "confianca":        confianca
+        })
 
     return {
         "KPIS": {
@@ -369,7 +441,11 @@ def dashFinanceiro(event, context):
             }
             for _, row in historico_mensal.iterrows()
         ],
+        "GRAFICOS": {
+            "DONUT_CUSTOS":      donut_custos,
+            "BARRAS_DATACENTER": barras_datacenter,
+            "TOP_SERVIDORES":    top_servidores,
+        },
+        "PROJECOES": projecoes,
         "total_dados": len(df)
     }
-
-
