@@ -9,6 +9,9 @@ import io
 
 s3 = boto3.client('s3')
 
+
+
+
 # Função inicial que chama as demais
 def lambda_handler(event, context):
     print("Lambda Iniciada!" )
@@ -17,6 +20,11 @@ def lambda_handler(event, context):
     #Verifica se é o JSON de metricas
     registro = event["Records"][0]["s3"]
     key = unquote_plus(registro["object"]["key"])
+
+    if not key.startswith("raw/"):
+        print(f"Ignorando arquivo fora do raw/: {key}")
+        return
+
     if key.lower().endswith(".json"):
         return f"Arquivo JSON detectado ({key}). Processamento ignorado."
         
@@ -144,7 +152,48 @@ def TrustedCsv(event, context):
     }
 
 
-#Função de envio dos JSON para o Client
+
+def dashAnalista(dados, geral):
+        print("Iniciando o client para a dashboard  analista 📀")
+
+        df = pd.DataFrame(dados)
+
+    
+
+        if df.empty:
+            print("⚠️ DataFrame vazio")
+            return {
+                "tipo": "analista",
+                "total_dados": 0,
+                "datacenters": {}
+            }
+
+        df["DATE"] = pd.to_datetime(df["DATE"])
+        df["EMPRESA"] = df["EMPRESA"].astype(str)
+        df["ZONA"]  = df["ZONA"].astype(str) 
+        df["DATACENTER"] = df["DATACENTER"].astype(str)
+        df["SERVIDOR"] = df["SERVIDOR"].astype(str)
+
+        for empresa in df.groupby(["EMPRESA"]):
+            print("AGORA EU ESTOU NA EMPRESA: ", empresa["EMPRESA"], "⛳")
+        
+            print("ESTA EMPRESA TEM: ", len(empresa), " PARA PROCESSAR")
+            for datacenter in df.groupby(["DATACENTER"]):
+                print("AGORA EU ESTOU NO DATACENTER: ", datacenter["DATACENTER"])
+                for zona in df.groupby(["ZONA"]):
+                    print("AGORA EU ESTOU NA ZONA: ", zona["CENTER"])
+                    for servidor in df.groupby(["SERVIDOR"]):
+                        print("ESTOU NO SERVIDOR", servidor["CENTER"])
+
+
+
+
+
+       
+
+
+
+    #Função de envio dos JSON para o Client
 def ClientGeral(bucket, chave):
     print(f"Lendo arquivo Trusted no S3: {chave}")
     
@@ -153,7 +202,6 @@ def ClientGeral(bucket, chave):
     
 
     # Le os arquivos do JSON feito pelo SAMU
-
     geral = {}
     try:
         resp_geral = s3.get_object(Bucket=bucket, Key="raw/geral.json")
@@ -168,7 +216,7 @@ def ClientGeral(bucket, chave):
     dados_dicionario = df.to_dict(orient="records")
 
   
-    respGestoraOp = dashOperacional(dados_dicionario, geral)
+    respGestoraOp = dashAnalista(dados_dicionario, geral)
    
  
 
@@ -182,6 +230,7 @@ def ClientGeral(bucket, chave):
     
     print("Todas as paginas processadas e atualizadas.")
     return "Lambda concluida com sucesso! ✅"
-    # DASH DE ALERTAS - Victor G
 
-    
+
+
+

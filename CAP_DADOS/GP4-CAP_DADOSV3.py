@@ -151,6 +151,9 @@ def validarServidor():
     
 
     id_empresa = empresa[0][0]
+
+
+
     
 
 
@@ -369,9 +372,9 @@ def capturaCSV(servidor):
 
         print()
         dados_dict = {
-            'EMPRESA': f'{servidor[0][16]}',
-            'REGIAO': f'{servidor[0][12]}',
-            'DATACENTER': f'{servidor[0][21]}',
+            'EMPRESA': f'{servidor[0][19]}',
+            'REGIAO': f'{servidor[0][14]}',
+            'DATACENTER': f'{servidor[0][9]}',
             'ZONA': f'{servidor[0][6].replace(" ", "")}',
             'SERVIDOR': f'{servidor[0][1]}',
             'CPU': cpu_negocio,
@@ -407,14 +410,17 @@ def capturaCSV(servidor):
             'JOGADORES_ATIVOS': jogadores_nossos
         }
 
+
+        print("OS DADOS DO SERVIDOR SÃO: ", servidor[0][19])
+
         print(f"""
             ----------------CAPTURANDO DADOS ----------------
 
             DATA/HORA: {tempo_agora}
 
-            EMPRESA: {servidor[0][16]}
-            REGIAO: {servidor[0][12]}
-            DATACENTER: {servidor[0][21]}
+            EMPRESA: {servidor[0][19]}
+            REGIAO: {servidor[0][14]}
+            DATACENTER: {servidor[0][9]}
             ZONA: {servidor[0][6]}
             SERVIDOR: {servidor[0][1]}
 

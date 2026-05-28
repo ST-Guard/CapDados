@@ -5,3 +5,6 @@ dados-brutos_maquina*
 dados-tratados*
 .venv
 .env.dev
+GP4-ETL-V3_LAMBDA.py
+GP4-ETL-SILVER_LAMBDA.py
+ETL/GP4-ETL-SILVER_LAMBDA.py

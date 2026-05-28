@@ -1,0 +1,43 @@
+{
+    "Steam": {
+        "ST-SP-01": {
+            "Zona A": {
+                "SERVIDOR-TC-03": {
+                    "tipo": "Web",
+                    "estado": "Ativo",
+                    "idServidor": 2,
+                    "idDataCenter": 1,
+                    "limites": {},
+                    "limiteIds": {},
+                    "funcionarios": []
+                }
+            },
+            "Zona B": {
+                "Servidor Teste": {
+                    "tipo": "Web",
+                    "estado": "Inativo",
+                    "idServidor": 3,
+                    "idDataCenter": 1,
+                    "limites": {},
+                    "limiteIds": {},
+                    "funcionarios": []
+                }
+            },
+            "Zona C": {
+                "Servidor Teste": {
+                    "tipo": "Web",
+                    "estado": "Ativo",
+                    "idServidor": 1,
+                    "idDataCenter": 1,
+                    "limites": {
+                        "RAM": 24.0
+                    },
+                    "limiteIds": {
+                        "RAM": 4
+                    },
+                    "funcionarios": []
+                }
+            }
+        }
+    }
+}
