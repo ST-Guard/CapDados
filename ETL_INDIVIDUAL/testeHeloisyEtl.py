@@ -360,7 +360,15 @@ def calcularScoreServidor(coletaServidor, limites):
             "scoreParcialAtual": 100,
             "scoreParcialAnterior": 100,
             "queda": 0,
-            "penalidadeTendencia": 0
+            "penalidadeTendencia": 0,
+            "projecaoSaude": {
+                "scoreAtual": 100,
+                "scoreProjetado": 100,
+                "risco": "Saudável",
+                "motivo": "Sem dados suficientes para projeção",
+                "componentesTendencia": [],
+                "penalidadeProjecao": 0
+            }
         }
 
     coletas_ordenadas = sorted(
@@ -383,17 +391,40 @@ def calcularScoreServidor(coletaServidor, limites):
     scoreFinal = scoreParcialAtual - penalidadeTendencia
     scoreFinal = max(0, min(100, scoreFinal))
 
+    componentesTendencia = calcularTendenciaComponentes(
+    janelaAnterior,
+    janelaAtual,
+    limites)
+
+    penalidadeProjecao = calcularPenalidadeProjecao(componentesTendencia)
+
+    scoreProjetado = scoreFinal - penalidadeProjecao
+    scoreProjetado = max(0, min(100, scoreProjetado))
+    
+    motivoProjecao = gerarMotivoProjecao(componentesTendencia)
     return {
         "score": round(scoreFinal, 2),
         "status": classificarStatusScore(scoreFinal),
         "scoreParcialAtual": round(scoreParcialAtual, 2),
         "scoreParcialAnterior": round(scoreParcialAnterior, 2),
         "queda": round(queda, 2),
-        "penalidadeTendencia": penalidadeTendencia
+        "penalidadeTendencia": penalidadeTendencia,
+        "projecaoSaude": {
+            "scoreAtual": round(scoreFinal, 2),
+            "scoreProjetado": round(scoreProjetado, 2),
+            "risco": classificarStatusScore(scoreProjetado),
+            "motivo": motivoProjecao,
+            "componentesTendencia": componentesTendencia,
+            "penalidadeProjecao": penalidadeProjecao
+        }
     }
+    print("\nPROJEÇÃO")
+    print("Score Atual:", scoreFinal)
+    print("Score Projetado:", scoreProjetado)
+    print("Motivo:", motivoProjecao)
+    print("Componentes:", componentesTendencia)
 
 #SCORE SAUDE ZONA 
-
 def calcularScoreZona(servidoresZona):
     total = len(servidoresZona)
 
@@ -530,6 +561,130 @@ def calcularScoreDatacenter(zonas):
         "zonaPiorScore": round(zonaPiorScore, 2)
     }
 
+
+#Projecao de score e tendencia de componentesque vão aumentar criticamente
+
+#calculando a média de cada componente
+def calcularMediaComponente(janela, campo):
+    if not janela:
+        return 0
+
+    soma = 0
+
+    for coleta in janela:
+        soma += converter_float(coleta.get(campo))
+
+    return soma / len(janela)
+
+#comparando as médias de cada janela e vendo se o componente está proximo do limite estabelecido par aumentar a penalidade
+def calcularTendenciaComponentes(janelaAnterior, janelaAtual, limites):
+    limiteCpu = converter_float(limites.get("CPU"), LIMITE_CPU)
+    limiteRam = converter_float(limites.get("RAM"), LIMITE_RAM)
+    limiteDisco = converter_float(limites.get("DISCO"), LIMITE_DISCO)
+    limiteLatencia = converter_float(limites.get("REDE"), LIMITE_LATENCIA)
+
+    componentes = [
+        {
+            "nome": "CPU",
+            "campo": "CPU_PER",
+            "limite": limiteCpu
+        },
+        {
+            "nome": "RAM",
+            "campo": "RAM_PER",
+            "limite": limiteRam
+        },
+        {
+            "nome": "Disco",
+            "campo": "DISCO_PER",
+            "limite": limiteDisco
+        },
+        {
+            "nome": "Latência",
+            "campo": "LATENCIA",
+            "limite": limiteLatencia
+        }
+    ]
+
+    tendencias = []
+
+    for componente in componentes:
+        mediaAnterior = calcularMediaComponente(
+            janelaAnterior,
+            componente["campo"]
+        )
+
+        mediaAtual = calcularMediaComponente(
+            janelaAtual,
+            componente["campo"]
+        )
+
+        crescimento = mediaAtual - mediaAnterior
+
+        if componente["limite"] > 0:
+            proximidadeLimite = mediaAtual / componente["limite"]
+        else:
+            proximidadeLimite = 0
+
+        riscoTendencia = 0
+
+        if crescimento > 0:
+            riscoTendencia += crescimento
+
+        if proximidadeLimite >= 1:
+            riscoTendencia += 15
+        elif proximidadeLimite >= 0.90:
+            riscoTendencia += 10
+        elif proximidadeLimite >= 0.80:
+            riscoTendencia += 5
+
+        if riscoTendencia >= 5:
+            tendencias.append({
+                "componente": componente["nome"],
+                "mediaAnterior": round(mediaAnterior, 2),
+                "mediaAtual": round(mediaAtual, 2),
+                "crescimento": round(crescimento, 2),
+                "proximidadeLimite": round(proximidadeLimite, 2),
+                "riscoTendencia": round(riscoTendencia, 2)
+            })
+
+    tendencias.sort(
+        key=lambda item: item["riscoTendencia"],
+        reverse=True
+    )
+
+    return tendencias
+
+#calculando a penalidade da projeção de acordo com o risco calculado de cada componente
+def calcularPenalidadeProjecao(componentesTendencia):
+    penalidade = 0
+
+    for componente in componentesTendencia:
+        risco = componente["riscoTendencia"]
+
+        if risco >= 25:
+            penalidade += 10
+        elif risco >= 15:
+            penalidade += 7
+        elif risco >= 5:
+            penalidade += 4
+
+    return min(penalidade, 25)
+
+#gerando o motivo dessa projeção ter diminuido 
+def gerarMotivoProjecao(componentesTendencia):
+    if len(componentesTendencia) == 0:
+        return "Sem riscos relevantes"
+
+    if len(componentesTendencia) == 1:
+        componente = componentesTendencia[0]["componente"]
+        return f"{componente} em tendência de crescimento"
+
+    componente1 = componentesTendencia[0]["componente"]
+    componente2 = componentesTendencia[1]["componente"]
+
+    return f"{componente1} e {componente2} em tendência de crescimento"
+
 def dashOperacional(dados, geral):
     print("\n🚀 ENTREI NA DASH OPERACIONAL")
 
@@ -596,7 +751,8 @@ def dashOperacional(dados, geral):
                     "scoreParcialAtual": resultadoScore["scoreParcialAtual"],
                     "scoreParcialAnterior": resultadoScore["scoreParcialAnterior"],
                     "queda": resultadoScore["queda"],
-                    "penalidadeTendencia": resultadoScore["penalidadeTendencia"]
+                    "penalidadeTendencia": resultadoScore["penalidadeTendencia"],
+                    "projecaoSaude": resultadoScore["projecaoSaude"]
                 }
 
                 servidoresZona.append(servidor_obj)
