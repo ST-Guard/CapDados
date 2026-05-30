@@ -189,7 +189,7 @@ def capturaCSV(servidor):
     arquivo_csv = f"dados-brutos-{servidor[0][1]}.csv"
     
 
-    with open(arquivo_csv, 'w', newline='') as csvfile:
+    with open(arquivo_csv, 'a', newline='') as csvfile:       
         colunas = ['EMPRESA', 'REGIAO', 'DATACENTER', 'ZONA', 'SERVIDOR', 'CPU', 'RAM_TOTAL', 'RAM_USADA', 'RAM_PERCENT',
                    'DISCO_TOTAL', 'DISCO_USADO', 'DISCO_PERCENT', 'LATENCIA', 'PACOTES_ENVIADOS', 'PACOTES_RECEBIDOS', 'PACOTES_PERDIDOS',
                    'QTD_PR', 'PROCESSO1_CPU', 'PORCENTAGEM_PROCESSO1_CPU', 'PROCESSO2_CPU', 'PORCENTAGEM_PROCESSO2_CPU', 'PROCESSO3_CPU', 'PORCENTAGEM_PROCESSO3_CPU',
@@ -197,7 +197,7 @@ def capturaCSV(servidor):
                    'QTD_NUCLEOS', 'USO_USER', 'USO_SISTEM', 'BOOTTIME', 'DATA_HORA', 'DIA_SEMANA', 'JOGADORES_ATIVOS']
         CSV_DIC_WRITER = csv.DictWriter(csvfile, fieldnames=colunas, delimiter=';')
 
-        if csvfile.tell() == 0:
+        if os.path.getsize(arquivo_csv) == 0:
             CSV_DIC_WRITER.writeheader()
 
         #pegando os componentes normais
@@ -246,8 +246,8 @@ def capturaCSV(servidor):
             2: 0.8,  
             3: 1.4,  
             4: 1.5,  
-            5: 1.1,  
-            6: 1.0   
+            5: 1.4,  
+            6: 1.2   
         }
 
         #----------------------------------------------------------
@@ -289,6 +289,10 @@ def capturaCSV(servidor):
         if latencia_base <= 0:
             latencia_base = random.uniform(8, 25)
 
+        if dia == 5 and 18 <= hora <= 23:
+            latencia_negocio = limitar(latencia_negocio, 25, 120)
+        else:
+            latencia_negocio = limitar(latencia_negocio, 5, 500)
         if manutencao:
             latencia_negocio = latencia_base * random.uniform(6, 12)
         else:
@@ -583,8 +587,8 @@ def capturaJson():
                 "funcionarios": []
             }
 
-    estruturaGeral[empresa][datacenter][zona][servidor]["limites"][componente] = linha["limite"]
-    estruturaGeral[empresa][datacenter][zona][servidor]["limiteIds"][componente] = linha["idComponente"]
+        estruturaGeral[empresa][datacenter][zona][servidor]["limites"][componente] = linha["limite"]
+        estruturaGeral[empresa][datacenter][zona][servidor]["limiteIds"][componente] = linha["idComponente"]
         
     if linha["nomeAnalista"] and linha["nomeAnalista"] not in [f["nome"] for f in estruturaGeral[empresa][datacenter][zona][servidor]["funcionarios"]]:
         estruturaGeral[empresa][datacenter][zona][servidor]["funcionarios"].append({

@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 import pandas as pd
 import requests
 import io
-import pymysql #biblioteca boa no lambda para acessar o banco!
 import os
 
 def conectarBanco():
