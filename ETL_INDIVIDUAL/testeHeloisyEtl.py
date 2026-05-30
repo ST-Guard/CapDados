@@ -211,6 +211,7 @@ LIMITE_RAM = 85
 LIMITE_DISCO = 70    
 LIMITE_LATENCIA = 50
 
+
 def converter_float(valor, padrao=0.0):
     try:
         return float(str(valor).replace(",", "."))
@@ -402,6 +403,12 @@ def calcularScoreServidor(coletaServidor, limites):
     scoreProjetado = max(0, min(100, scoreProjetado))
     
     motivoProjecao = gerarMotivoProjecao(componentesTendencia)
+
+    print("\nPROJEÇÃO")
+    print("Score Atual:", scoreFinal)
+    print("Score Projetado:", scoreProjetado)
+    print("Motivo:", motivoProjecao)
+    print("Componentes:", componentesTendencia)
     return {
         "score": round(scoreFinal, 2),
         "status": classificarStatusScore(scoreFinal),
@@ -418,11 +425,7 @@ def calcularScoreServidor(coletaServidor, limites):
             "penalidadeProjecao": penalidadeProjecao
         }
     }
-    print("\nPROJEÇÃO")
-    print("Score Atual:", scoreFinal)
-    print("Score Projetado:", scoreProjetado)
-    print("Motivo:", motivoProjecao)
-    print("Componentes:", componentesTendencia)
+   
 
 #SCORE SAUDE ZONA 
 def calcularScoreZona(servidoresZona):
@@ -576,8 +579,40 @@ def calcularMediaComponente(janela, campo):
 
     return soma / len(janela)
 
-#comparando as médias de cada janela e vendo se o componente está proximo do limite estabelecido par aumentar a penalidade
+
+
+#def que calcula a persistencia de uso de cada componente e a sua relação com o limite dele
+def calcularPersistenciaComponente(janela, campo, limite):
+    if not janela:
+        return 0
+
+    qntColetasCriticas = 0
+
+    for coleta in janela:
+        valor = converter_float(coleta.get(campo))
+
+        if valor > limite:
+            qntColetasCriticas += 1
+
+    return qntColetasCriticas / len(janela)
+
+
+def obterPesoComponente(nomeComponente):
+    pesos = {
+        "CPU": 1.0,
+        "RAM": 1.2,
+        "Disco": 1.3,
+        "Latência": 0.9
+    }
+
+    return pesos.get(nomeComponente, 1.0)
+
+#def que calcula a tendencia do socmponentes levando em consideração a persistencia atual comparando com a anterior e tambḿe com amédia de uso de cadac coponente da atual vs anterior, com um peso para cada situação
 def calcularTendenciaComponentes(janelaAnterior, janelaAtual, limites):
+
+    if len(janelaAnterior) < 10 or len(janelaAtual) < 10:
+        return []
+
     limiteCpu = converter_float(limites.get("CPU"), LIMITE_CPU)
     limiteRam = converter_float(limites.get("RAM"), LIMITE_RAM)
     limiteDisco = converter_float(limites.get("DISCO"), LIMITE_DISCO)
@@ -609,17 +644,25 @@ def calcularTendenciaComponentes(janelaAnterior, janelaAtual, limites):
     tendencias = []
 
     for componente in componentes:
-        mediaAnterior = calcularMediaComponente(
+
+        persistenciaAnterior = calcularPersistenciaComponente(
             janelaAnterior,
-            componente["campo"]
+            componente["campo"],
+            componente["limite"]
         )
+
+        persistenciaAtual = calcularPersistenciaComponente(
+            janelaAtual,
+            componente["campo"],
+            componente["limite"]
+        )
+
+        aumentoPersistencia = persistenciaAtual - persistenciaAnterior
 
         mediaAtual = calcularMediaComponente(
             janelaAtual,
             componente["campo"]
         )
-
-        crescimento = mediaAtual - mediaAnterior
 
         if componente["limite"] > 0:
             proximidadeLimite = mediaAtual / componente["limite"]
@@ -628,22 +671,37 @@ def calcularTendenciaComponentes(janelaAnterior, janelaAtual, limites):
 
         riscoTendencia = 0
 
-        if crescimento > 0:
-            riscoTendencia += crescimento
+        if aumentoPersistencia >= 0.50:
+            riscoTendencia += 15
+        elif aumentoPersistencia >= 0.30:
+            riscoTendencia += 10
+        elif aumentoPersistencia >= 0.15:
+            riscoTendencia += 5
+
+        if persistenciaAtual >= 0.80:
+            riscoTendencia += 8
+        elif persistenciaAtual >= 0.60:
+            riscoTendencia += 5
+        elif persistenciaAtual >= 0.40:
+            riscoTendencia += 3
 
         if proximidadeLimite >= 1:
-            riscoTendencia += 15
-        elif proximidadeLimite >= 0.90:
             riscoTendencia += 10
+        elif proximidadeLimite >= 0.90:
+            riscoTendencia += 7
         elif proximidadeLimite >= 0.80:
-            riscoTendencia += 5
+            riscoTendencia += 4
+
+        pesoComponente = obterPesoComponente(componente["nome"])
+        riscoTendencia = riscoTendencia * pesoComponente
 
         if riscoTendencia >= 5:
             tendencias.append({
                 "componente": componente["nome"],
-                "mediaAnterior": round(mediaAnterior, 2),
+                "persistenciaAnterior": round(persistenciaAnterior * 100, 2),
+                "persistenciaAtual": round(persistenciaAtual * 100, 2),
+                "aumentoPersistencia": round(aumentoPersistencia * 100, 2),
                 "mediaAtual": round(mediaAtual, 2),
-                "crescimento": round(crescimento, 2),
                 "proximidadeLimite": round(proximidadeLimite, 2),
                 "riscoTendencia": round(riscoTendencia, 2)
             })
@@ -655,7 +713,28 @@ def calcularTendenciaComponentes(janelaAnterior, janelaAtual, limites):
 
     return tendencias
 
-#calculando a penalidade da projeção de acordo com o risco calculado de cada componente
+#def que identifica o motivo da projeção, quais componentes vão resultar naquilo
+def gerarMotivoProjecao(componentesTendencia):
+    if len(componentesTendencia) == 0:
+        return "Sem riscos relevantes"
+
+    if len(componentesTendencia) == 1:
+        componente = componentesTendencia[0]
+
+        return (
+            f"{componente['componente']} com aumento de persistência crítica "
+            f"({componente['aumentoPersistencia']} p.p.)"
+        )
+
+    componente1 = componentesTendencia[0]
+    componente2 = componentesTendencia[1]
+
+    return (
+        f"{componente1['componente']} e {componente2['componente']} "
+        f"com aumento de persistência crítica"
+    )
+
+#def que calcula a penalidade da previsão para montarnos o score previsto
 def calcularPenalidadeProjecao(componentesTendencia):
     penalidade = 0
 
@@ -670,22 +749,6 @@ def calcularPenalidadeProjecao(componentesTendencia):
             penalidade += 4
 
     return min(penalidade, 25)
-
-#gerando o motivo dessa projeção ter diminuido 
-def gerarMotivoProjecao(componentesTendencia):
-    if len(componentesTendencia) == 0:
-        return "Sem riscos relevantes"
-
-    if len(componentesTendencia) == 1:
-        componente = componentesTendencia[0]["componente"]
-        return f"{componente} em tendência de crescimento"
-
-    componente1 = componentesTendencia[0]["componente"]
-    componente2 = componentesTendencia[1]["componente"]
-
-    return f"{componente1} e {componente2} em tendência de crescimento"
-
-
 #gerando o uptime de cada servidor
 
 #Fazendo def que carrega o historico de alertas
@@ -729,14 +792,15 @@ def calcularAlertaSemana( historicoAlertas, empresa,datacenter):
         "Domingo": 0
     }
 
-    resultado = {}
-
     agora = datetime.now()
     inicioSemana = agora - timedelta(days=agora.weekday())
     fimSemana = inicioSemana + timedelta(days=7)
 
     for alerta in historicoAlertas:
-        if (alerta["empresa"] != empresa or alerta["datacenter"] != datacenter):
+        if (
+            str(alerta.get("empresa", "")) != str(empresa)
+            or str(alerta.get("datacenter", "")) != str(datacenter)
+        ):
             continue
 
         ts = str(alerta.get("timestamp", ""))
@@ -754,7 +818,7 @@ def calcularAlertaSemana( historicoAlertas, empresa,datacenter):
         nomeDia = diasSemana[dataAlerta.weekday()]
         alertasPorDia[nomeDia] += 1
 
-        totalAlertas = sum(alertasPorDia.values())
+    totalAlertas = sum(alertasPorDia.values())
 
     mediaAlertas = round(totalAlertas / 7, 2)
 

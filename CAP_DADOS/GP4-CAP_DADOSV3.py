@@ -16,7 +16,7 @@ import random
 
 
 arquivo_csv = "dados-brutos_maquina.csv"
-bucket_name = 'datalake-smartdata2'
+bucket_name = 's3-testesmartheloisy'
 
 #STE12345
 #SRV-DC01-WEB-05
@@ -33,11 +33,17 @@ print("""\033[33m
 
 \033[m""")
 
-load_dotenv()
+load_dotenv('venvPI/CapDados/.env.dev')
+print("=== VERIFICANDO VARIÁVEIS DE AMBIENTE ===")
+print(f"DB_HOST: {os.getenv('DB_HOST')}")
+print(f"DB_USER: {os.getenv('DB_USER')}")
+print(f"DB_PASSWORD: {'******' if os.getenv('DB_PASSWORD') else 'NÃO ENCONTRADA'}")
+print(f"DB_NAME: {os.getenv('DB_NAME')}")
+print("==========================================")
 
-chave_acesso = os.getenv('aws_access_key_id')
-chave_secreta = os.getenv('aws_secret_access_key')
-token_sessao = os.getenv('aws_session_token')
+chave_acesso = os.getenv('AWS_ACCESS_KEY_ID')
+chave_secreta = os.getenv('AWS_SECRET_ACCESS_KEY')
+token_sessao = os.getenv('AWS_SESSION_TOKEN')
 
 # Banco de Dados
 banco_host = os.getenv('DB_HOST')
