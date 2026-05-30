@@ -168,7 +168,7 @@ def ClientGeral(bucket, chave):
     dados_dicionario = df.to_dict(orient="records")
 
   
-    respGestoraOp = dashOperacional(dados_dicionario, geral)
+    respGestoraOp = dashOperacional(dados_dicionario, geral, bucket)
    
  
 
@@ -685,10 +685,88 @@ def gerarMotivoProjecao(componentesTendencia):
 
     return f"{componente1} e {componente2} em tendência de crescimento"
 
-def dashOperacional(dados, geral):
+
+#gerando o uptime de cada servidor
+
+#Fazendo def que carrega o historico de alertas
+def carregarHistoricoAlertas(bucket):
+    pathHistorico = "trusted/alertas_historico.json"
+    try:
+        resp_hist = s3.get_object(
+            Bucket=bucket,
+            Key=pathHistorico
+        )
+        historicoAlertas = json.loads(
+            resp_hist['Body'].read().decode('utf-8')
+        )
+        print(f"✅ Histórico carregado: {len(historicoAlertas)} alertas")
+        return historicoAlertas
+    
+    except Exception as e:
+        print(f"⚠️ Histórico não encontrado: {e}")
+        return []
+
+#def que calcula a quantidade de alertas em cada dia da semana
+def calcularAlertaSemana( historicoAlertas, empresa,datacenter):
+
+    diasSemana = {
+        0: "Segunda",
+        1: "Terça",
+        2: "Quarta",
+        3: "Quinta",
+        4: "Sexta",
+        5: "Sábado",
+        6: "Domingo"
+    }
+
+    alertasPorDia = {
+        "Segunda": 0,
+        "Terça": 0,
+        "Quarta": 0,
+        "Quinta": 0,
+        "Sexta": 0,
+        "Sábado": 0,
+        "Domingo": 0
+    }
+
+    resultado = {}
+
+    agora = datetime.now()
+    inicioSemana = agora - timedelta(days=agora.weekday())
+    fimSemana = inicioSemana + timedelta(days=7)
+
+    for alerta in historicoAlertas:
+        if (alerta["empresa"] != empresa or alerta["datacenter"] != datacenter):
+            continue
+
+        ts = str(alerta.get("timestamp", ""))
+        try:
+            dataAlerta = datetime.fromisoformat(ts).replace(tzinfo=None)
+        except:
+            continue
+
+        if dataAlerta < inicioSemana:
+            continue
+
+        if dataAlerta >= fimSemana:
+            continue
+
+        nomeDia = diasSemana[dataAlerta.weekday()]
+        alertasPorDia[nomeDia] += 1
+
+        totalAlertas = sum(alertasPorDia.values())
+
+    mediaAlertas = round(totalAlertas / 7, 2)
+
+    alertasPorDia["media"] = mediaAlertas
+
+    return alertasPorDia
+
+def dashOperacional(dados, geral, bucket):
     print("\n🚀 ENTREI NA DASH OPERACIONAL")
 
     df = pd.DataFrame(dados)
+
 
     if df.empty:
         print("⚠️ DataFrame vazio")
@@ -699,13 +777,18 @@ def dashOperacional(dados, geral):
         }
 
     df["DATE"] = pd.to_datetime(df["DATE"])
-
+    historicoAlertas = carregarHistoricoAlertas(bucket)
     resultado = {}
 
     for (empresa, datacenter), df_dc in df.groupby(["EMPRESA", "DATACENTER"]):
 
         print(f"\n🏢 DATACENTER: {datacenter}")
 
+        graficoAlertasSemana = calcularAlertaSemana(
+            historicoAlertas,
+            empresa,
+            datacenter)
+        
         zonas = []
         servidores_datacenter = []
 
@@ -804,7 +887,9 @@ def dashOperacional(dados, geral):
             "qntZonasAtencao": resultadoDatacenter["qntZonasAtencao"],
             "zonaPiorScore": resultadoDatacenter["zonaPiorScore"],
             "zonas": zonas,
-            "rankingSrvCriticosTop5": rankingSrvCriticosTop5
+            "rankingSrvCriticosTop5": rankingSrvCriticosTop5,
+            "graficoAlertasSemana": graficoAlertasSemana
+
         }
 
         print(f"✅ JSON FINAL DO DATACENTER {datacenter} CRIADO")
@@ -816,3 +901,4 @@ def dashOperacional(dados, geral):
         "total_dados": len(dados),
         "datacenters": resultado
     }
+
