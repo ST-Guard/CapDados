@@ -345,33 +345,51 @@ def dashFinanceiro(event, context):
         "fixo_global": global_mes
     }
     
-    # ── GRÁFICO BARRAS — Custo por datacenter e zona (mês corrente) ──
+   # ── GRÁFICO BARRAS — Custo por datacenter e zona (mês corrente) ──
     df_mes_completo = df[df['MES'] == mes_corrente].copy()
-    df_mes_completo['CUSTO_VAR'] = (
+    
+    
+    df_mes_completo['CUSTO_ENERGIA'] = (
         ((POTENCIA_MIN_W + (POTENCIA_MAX_W - POTENCIA_MIN_W) *
           ((df_mes_completo['CPU_PER']/100 * PESO_CPU_ENERGIA) +
            (df_mes_completo['RAM_PER']/100 * PESO_RAM_ENERGIA) +
            (df_mes_completo['DISCO_PER']/100 * PESO_DISCO_ENERGIA))) / 1000) * (5/60) * TARIFA_KWH
-        + (df_mes_completo['PACOTES_ENV'] + df_mes_completo['PACOTES_RCB']) * CUSTO_BANDA_POR_PACOTE
     )
     
+    df_mes_completo['CUSTO_VAR'] = df_mes_completo['CUSTO_ENERGIA'] + (df_mes_completo['PACOTES_ENV'] + df_mes_completo['PACOTES_RCB']) * CUSTO_BANDA_POR_PACOTE
+   
+    qtd_servidores_intervalo = df_mes_completo.groupby('DATE_5MIN')['SERVIDOR'].transform('nunique')
+    df_mes_completo['CUSTO_TOTAL_LINHA'] = df_mes_completo['CUSTO_VAR'] + CUSTO_HW_5MIN + (CUSTO_GLOBAL_5MIN / qtd_servidores_intervalo)
+    
     barras_datacenter = (
-        df_mes_completo.groupby(['DATACENTER', 'ZONA'])['CUSTO_VAR']
-        .sum().reset_index()
-        .rename(columns={'CUSTO_VAR': 'custo'})
-        .assign(custo=lambda x: x['custo'].round(2))
+        df_mes_completo.groupby(['DATACENTER', 'ZONA'])
+        .agg(
+            custo=('CUSTO_VAR', 'sum'),                
+            custo_total=('CUSTO_TOTAL_LINHA', 'sum'),   
+            receita=('RECEITA_5MIN', 'sum')
+        )
+        .reset_index()
+        .assign(
+            custo = lambda x: x['custo'].round(2),
+            roi   = lambda x: np.where(x['custo_total'] > 0, ((x['receita'] - x['custo_total']) / x['custo_total'] * 100).round(2), 0.0)
+        )
+        .drop(columns=['custo_total', 'receita'])
         .to_dict(orient='records')
     )
     
     # ── TABELA — Top servidores por custo (mês corrente) ──
-    custo_total_var = df_mes_completo.groupby('SERVIDOR')['CUSTO_VAR'].sum()
+    custos_servidor = df_mes_completo.groupby(['SERVIDOR', 'DATACENTER', 'ZONA'])[['CUSTO_VAR', 'CUSTO_ENERGIA']].sum()
+    
     top_servidores = (
-        custo_total_var
+        custos_servidor
         .reset_index()
-        .rename(columns={'CUSTO_VAR': 'custo'})
+        .rename(columns={'CUSTO_VAR': 'custo', 'CUSTO_ENERGIA': 'custo_energia'})
         .assign(
-            custo       = lambda x: x['custo'].round(2),
-            percentual  = lambda x: (x['custo'] / x['custo'].sum() * 100).round(1)
+            custo         = lambda x: x['custo'].round(2),
+            custo_energia = lambda x: x['custo_energia'].round(2),
+            percentual    = lambda x: (x['custo'] / x['custo'].sum() * 100).round(1),
+            datacenter    = lambda x: x['DATACENTER'].astype(str).str.split('-').str[0],
+            zona          = lambda x: x['ZONA']
         )
         .sort_values('custo', ascending=False)
         .to_dict(orient='records')
