@@ -16,7 +16,7 @@ import random
 
 
 arquivo_csv = "dados-brutos_maquina.csv"
-bucket_name = 's3-testesmartheloisy'
+bucket_name = 'smartdatabucket2'
 
 #STE12345
 #SRV-DC01-WEB-05
@@ -33,7 +33,11 @@ print("""\033[33m
 
 \033[m""")
 
-load_dotenv('CapDados/CAP_DADOS/.env.dev')
+
+#STE12345
+#SRV-DC01-WEB-05
+
+load_dotenv()
 print("=== VERIFICANDO VARIÁVEIS DE AMBIENTE ===")
 print(f"DB_HOST: {os.getenv('DB_HOST')}")
 print(f"DB_USER: {os.getenv('DB_USER')}")
