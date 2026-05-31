@@ -8,14 +8,7 @@ import requests
 import io
 import os
 
-def conectarBanco():
-    return pymysql.connect(
-        host=os.environ["DB_HOST"],
-        user=os.environ["DB_USER"],
-        password=os.environ["DB_PASSWORD"],
-        database=os.environ["DB_NAME"],
-        cursorclass=pymysql.cursors.DictCursor
-    )
+
 s3 = boto3.client('s3')
 
 # Função inicial que chama as demais
@@ -130,6 +123,7 @@ def TrustedCsv(event, context):
     df = df[list(colunas_finais.keys())].rename(columns=colunas_finais)
 
     df_mestre = pd.DataFrame()
+
     try:
         print(f"Tentando ler arquivo mestre existente: {chave_destino_mestre}")
         resposta_mestre = s3.get_object(Bucket=bucket, Key=chave_destino_mestre)
@@ -140,6 +134,16 @@ def TrustedCsv(event, context):
         print("Arquivo mestre nao encontrado. Criando um novo do zero.")
 
     df_unificado = pd.concat([df_mestre, df], ignore_index=True)
+
+    df["DATA_HORA"] = pd.to_datetime(df["DATA_HORA"], errors="coerce")
+    df = df.dropna(subset=["DATA_HORA"])    
+    df_unificado = df_unificado.dropna(subset=["DATE"])
+    df_unificado = df_unificado[df_unificado["DATE"] >= limite_tempo7]
+
+    df_unificado = df_unificado.drop_duplicates(
+    subset=["EMPRESA", "DATACENTER", "ZONA", "SERVIDOR", "DATE"],
+    keep="last"
+)
 
     df_unificado.to_csv(caminho_local_mestre, sep=";", index=False, encoding="utf-8")
 
@@ -153,48 +157,49 @@ def TrustedCsv(event, context):
     }
 
 
+#funcao que crrega as métricas de cada componente daquele datacenter
+def carregarMetricasJson(bucket):
+    try:
+        s3 = boto3.client("s3")
+
+        resposta = s3.get_object(
+            Bucket=bucket,
+            Key="raw/metricas.json"
+        )
+
+        conteudo = resposta["Body"].read().decode("utf-8")
+        metricasJson = json.loads(conteudo)
+
+        print("✅ metricas.json carregado do S3")
+        return metricasJson
+
+    except Exception as e:
+        print(f"⚠️ Erro ao carregar metricas.json: {e}")
+        return {}
+    
 #Função de envio dos JSON para o Client
 def ClientGeral(bucket, chave):
     print(f"Lendo arquivo Trusted no S3: {chave}")
     
     resposta = s3.get_object(Bucket=bucket, Key=chave)
-    conteudo_texto = resposta['Body'].read().decode('utf-8')
-    
+    conteudo_texto = resposta["Body"].read().decode("utf-8")
 
-    # Le os arquivos do JSON feito pelo SAMU
+    geral = carregarMetricasJson(bucket)
 
-    geral = {}
-    try:
-        resp_geral = s3.get_object(Bucket=bucket, Key="raw/geral.json")
-        geral = json.loads(resp_geral['Body'].read().decode('utf-8'))
-        print(f"geral.json carregado com sucesso.")
-    except Exception as e:
-        print(f"geral.json não encontrado — . Erro: {e}")
- 
-
-    
     df = pd.read_csv(io.StringIO(conteudo_texto), delimiter=";")
     dados_dicionario = df.to_dict(orient="records")
 
-  
     respGestoraOp = dashOperacional(dados_dicionario, geral, bucket)
-   
- 
-
 
     s3.put_object(
         Bucket=bucket,
         Key="client/gestoraOp_master.json",
-        Body=json.dumps(respGestoraOp, default=str, indent=4)
+        Body=json.dumps(respGestoraOp, default=str, indent=4),
+        ContentType="application/json"
     )
 
-    
     print("Todas as paginas processadas e atualizadas.")
     return "Lambda concluida com sucesso! ✅"
-    # DASH DE ALERTAS - Victor G
-
-    
-
     
 
 # ZONA DE TRABALHO
@@ -212,8 +217,6 @@ def dashServidores(dados):
 
 
 ###########################################################DASHBOARD OPERACIONAL GESTOR####################################################################
-
-
 #SCORE SAUDE SERVIDOR
 LIMITE_CPU = 80
 LIMITE_RAM = 85
@@ -769,117 +772,45 @@ def classificarStatusUptime(uptime):
         return "Atenção"
     return "Crítico"
 
-def obterIntervaloIndisponibilidade(chamado, inicioPeriodo, fimPeriodo):
-    abertoEm = converterDatetime(chamado.get("aberto_em"))
-    resolvidoEm = converterDatetime(chamado.get("resolvido_em"))
+#df que lê o json de chamados
+def carregarChamadosJson(bucket):
+    try:
+        s3 = boto3.client("s3")
 
-    if abertoEm is None:
-        return None
-
-    if resolvidoEm is None:
-        resolvidoEm = fimPeriodo
-
-    inicioIntervalo = max(abertoEm, inicioPeriodo)
-    fimIntervalo = min(resolvidoEm, fimPeriodo)
-
-    if fimIntervalo <= inicioIntervalo:
-        return None
-
-    return {
-        "inicio": inicioIntervalo,
-        "fim": fimIntervalo
-    }
-
-def juntarIntervalos(intervalos):
-    if not intervalos:
-        return []
-
-    intervalosOrdenados = sorted(
-        intervalos,
-        key=lambda intervalo: intervalo["inicio"]
-    )
-
-    intervalosUnidos = [intervalosOrdenados[0]]
-
-    for intervaloAtual in intervalosOrdenados[1:]:
-        ultimoIntervalo = intervalosUnidos[-1]
-
-        if intervaloAtual["inicio"] <= ultimoIntervalo["fim"]:
-            ultimoIntervalo["fim"] = max(
-                ultimoIntervalo["fim"],
-                intervaloAtual["fim"]
-            )
-        else:
-            intervalosUnidos.append(intervaloAtual)
-
-    return intervalosUnidos
-def calcularUptimeServidor(chamadosServidor, servidor, zona, inicioPeriodo, fimPeriodo):
-    tempoTotalHoras = (fimPeriodo - inicioPeriodo).total_seconds() / 3600
-
-    intervalos = []
-    qtdChamadosCriticos = 0
-
-    for chamado in chamadosServidor:
-        if str(chamado.get("severidade", "")).lower() != "critico":
-            continue
-
-        qtdChamadosCriticos += 1
-
-        intervalo = obterIntervaloIndisponibilidade(
-            chamado,
-            inicioPeriodo,
-            fimPeriodo
+        resposta = s3.get_object(
+            Bucket=bucket,
+            Key="raw/chamados.json"
         )
 
-        if intervalo is not None:
-            intervalos.append(intervalo)
+        conteudo = resposta["Body"].read().decode("utf-8")
+        chamadosJson = json.loads(conteudo)
 
-    intervalosUnidos = juntarIntervalos(intervalos)
+        print("✅ chamados.json carregado do S3")
+        return chamadosJson
 
-    tempoIndisponivelHoras = 0
+    except Exception as e:
+        print(f"⚠️ Erro ao carregar chamados.json: {e}")
+        return {}
 
-    for intervalo in intervalosUnidos:
-        duracaoHoras = (
-            intervalo["fim"] - intervalo["inicio"]
-        ).total_seconds() / 3600
+#df que pega os chamadso de cada srv individualmente
+def obterChamadosServidor(chamadosJson, empresa, datacenter, zona, servidor):
+    try:
+        dadosServidor = chamadosJson[empresa][datacenter][zona][servidor]
+        return dadosServidor.get("chamados", [])
 
-        tempoIndisponivelHoras += duracaoHoras
+    except (KeyError, TypeError):
+        return []
 
-    if tempoTotalHoras <= 0:
-        uptime = 100
-    else:
-        uptime = (
-            (tempoTotalHoras - tempoIndisponivelHoras)
-            / tempoTotalHoras
-        ) * 100
+#df filtrando apenas os chamados criticos que afetam a disponibilidade do srv
+def chamadoContaComoIndisponibilidade(chamado):
+    severidade = chamado.get("severidade")
 
-    uptime = max(0, min(100, uptime))
+    if severidade is None or str(severidade).strip() == "":
+        return True
 
-    return {
-        "servidor": servidor,
-        "zona": zona,
-        "uptime": round(uptime, 2),
-        "tempoIndisponivelHoras": round(tempoIndisponivelHoras, 2),
-        "qtdChamadosCriticos": qtdChamadosCriticos,
-        "qtdIntervalosIndisponibilidade": len(intervalosUnidos),
-        "statusUptime": classificarStatusUptime(uptime)
-    }
+    return str(severidade).lower() in ["critico", "crítico"]
 
-def filtrarChamadosServidor(chamados, empresa, datacenter, zona, servidor):
-    chamadosServidor = []
-
-    for chamado in chamados:
-        if (
-            str(chamado.get("empresa", "")) == str(empresa)
-            and str(chamado.get("datacenter", "")) == str(datacenter)
-            and str(chamado.get("zona", "")) == str(zona)
-            and str(chamado.get("servidor", "")) == str(servidor)
-        ):
-            chamadosServidor.append(chamado)
-
-    return chamadosServidor
-
-def converterDatetime(valor):
+def converterData(valor):
     if valor is None:
         return None
 
@@ -887,73 +818,124 @@ def converterDatetime(valor):
         return valor.replace(tzinfo=None)
 
     if isinstance(valor, str):
-        return datetime.fromisoformat(valor).replace(tzinfo=None)
+        valor = valor.strip()
 
-    return valor
-def carregarChamadosCriticosUptime(inicioPeriodo, fimPeriodo):
-    conexao = None
+        if valor == "":
+            return None
 
-    try:
-        conexao = conectarBanco()
+        try:
+            return datetime.fromisoformat(valor).replace(tzinfo=None)
+        except ValueError:
+            try:
+                return datetime.strptime(valor, "%Y-%m-%d %H:%M:%S").replace(tzinfo=None)
+            except ValueError:
+                print(f"⚠️ Data inválida: {valor}")
+                return None
 
-        with conexao.cursor() as cursor:
-            sql = """
-                SELECT DISTINCT
-                    e.razaoSocial AS empresa,
-                    dc.nome AS datacenter,
-                    z.nome AS zona,
-                    s.nome AS servidor,
-                    ra.severidade,
-                    ra.issue_key,
-                    ra.aberto_em,
-                    ra.resolvido_em
-                FROM registros_alertas ra
-                JOIN servidor s
-                    ON s.idServidor = ra.fkRegistroServidor
-                JOIN zona z
-                    ON z.idZona = s.fkZona
-                JOIN datacenter dc
-                    ON dc.idDataCenter = z.fkDataCenter
-                JOIN regiao r
-                    ON r.fkRegiaoDataCenter = dc.idDataCenter
-                JOIN empresa e
-                    ON e.idEmpresa = r.fkRegiaoEmpresa
-                WHERE ra.severidade = 'critico'
-                  AND ra.aberto_em < %s
-                  AND (ra.resolvido_em IS NULL OR ra.resolvido_em > %s)
-            """
+    return None
 
-            cursor.execute(sql, (fimPeriodo, inicioPeriodo))
-            chamados = cursor.fetchall()
+#def que de acordo com os seguntos em que o chamado ficou aberto( rodando a cada 5 minuots para a atualização) considera isso como indisponibilidade e faz o calculo do uptime do servidor
+def calcularUptimeServidor(chamadosServidor, servidor, zona, inicioPeriodo, fimPeriodo):
+    tempoTotalSegundos = (fimPeriodo - inicioPeriodo).total_seconds()
 
-            print(f"✅ Chamados críticos carregados: {len(chamados)}")
+    tempoIndisponivelSegundos = 0
+    qtdChamadosIndisponibilidade = 0
 
-            return chamados
+    for chamado in chamadosServidor:
+        if not chamadoContaComoIndisponibilidade(chamado):
+            continue
 
-    except Exception as e:
-        print(f"⚠️ Erro ao buscar chamados críticos: {e}")
-        return []
+        duracaoSegundos = chamado.get("duracaoSegundos")
 
-    finally:
-        if conexao is not None:
-            conexao.close()
+        if duracaoSegundos is not None:
+            try:
+                duracao = float(duracaoSegundos)
+
+                if duracao < 0:
+                    print(f"⚠️ Duração negativa ignorada no servidor {servidor}: {duracao}")
+                    continue
+
+                duracao = min(duracao, tempoTotalSegundos)
+
+                tempoIndisponivelSegundos += duracao
+                qtdChamadosIndisponibilidade += 1
+                continue
+
+            except (ValueError, TypeError):
+                print(f"⚠️ Duração inválida no chamado do servidor {servidor}: {duracaoSegundos}")
+
+        abertura = (
+            chamado.get("abertura")
+            or chamado.get("aberto_em")
+            or chamado.get("inicioIndisponibilidade")
+        )
+
+        abertura = converterData(abertura)
+
+        if abertura is None:
+            continue
+
+        inicioIndisponibilidade = max(abertura, inicioPeriodo)
+        fimIndisponibilidade = fimPeriodo
+
+        if fimIndisponibilidade <= inicioIndisponibilidade:
+            continue
+
+        duracaoCalculada = (fimIndisponibilidade - inicioIndisponibilidade).total_seconds()
+
+        if duracaoCalculada < 0:
+            continue
+
+        duracaoCalculada = min(duracaoCalculada, tempoTotalSegundos)
+
+        tempoIndisponivelSegundos += duracaoCalculada
+        qtdChamadosIndisponibilidade += 1
+
+    tempoIndisponivelSegundos = min(
+        tempoIndisponivelSegundos,
+        tempoTotalSegundos
+    )
+
+    if tempoTotalSegundos <= 0:
+        uptime = 100
+    else:
+        uptime = ((tempoTotalSegundos - tempoIndisponivelSegundos) / tempoTotalSegundos) * 100
+
+    uptime = max(0, min(100, uptime))
+
+    tempoIndisponivelHoras = tempoIndisponivelSegundos / 3600
+
+    return {
+        "servidor": servidor,
+        "zona": zona,
+        "uptime": round(uptime, 2),
+        "tempoIndisponivelSegundos": round(tempoIndisponivelSegundos, 2),
+        "tempoIndisponivelHoras": round(tempoIndisponivelHoras, 2),
+        "qtdChamadosIndisponibilidade": qtdChamadosIndisponibilidade,
+        "statusUptime": classificarStatusUptime(uptime)
+    }
 #------------------------------------------------------------------------------------------------------------------------------------------------
 
 #alertas semana
 def carregarHistoricoAlertas(bucket):
-    pathHistorico = "trusted/alertas_historico.json"
-    try:
+   pathHistorico = "trusted/alertas_historico.json"
+
+   try:
+        s3 = boto3.client("s3")
+
         resp_hist = s3.get_object(
             Bucket=bucket,
             Key=pathHistorico
         )
+
         historicoAlertas = json.loads(
-            resp_hist['Body'].read().decode('utf-8')
+            resp_hist["Body"].read().decode("utf-8")
         )
+
         print(f"✅ Histórico carregado: {len(historicoAlertas)} alertas")
         return historicoAlertas
-    
-    except Exception as e:
+   
+   except Exception as e:
         print(f"⚠️ Histórico não encontrado: {e}")
         return []
 
@@ -981,7 +963,9 @@ def calcularAlertaSemana( historicoAlertas, empresa,datacenter):
     }
 
     agora = datetime.now()
-    inicioSemana = agora - timedelta(days=agora.weekday())
+    inicioSemana = (agora - timedelta(days=agora.weekday())).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
     fimSemana = inicioSemana + timedelta(days=7)
 
     for alerta in historicoAlertas:
@@ -1046,7 +1030,9 @@ def calcularKpiServidoresCriticos(servidores_datacenter):
 def calcularCrescimentoIncidentes(historicoAlertas, empresa, datacenter):
     agora = datetime.now()
 
-    inicioSemanaAtual = agora - timedelta(days=agora.weekday())
+    inicioSemanaAtual = (agora - timedelta(days=agora.weekday())).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
     fimSemanaAtual = inicioSemanaAtual + timedelta(days=7)
 
     inicioSemanaAnterior = inicioSemanaAtual - timedelta(days=7)
@@ -1066,14 +1052,14 @@ def calcularCrescimentoIncidentes(historicoAlertas, empresa, datacenter):
 
         try:
             dataAlerta = datetime.fromisoformat(ts).replace(tzinfo=None)
-        except:
+        except Exception:
             continue
 
         if inicioSemanaAtual <= dataAlerta < fimSemanaAtual:
             alertasSemanaAtual += 1
-
         elif inicioSemanaAnterior <= dataAlerta < fimSemanaAnterior:
             alertasSemanaAnterior += 1
+
     if alertasSemanaAnterior == 0:
         if alertasSemanaAtual > 0:
             crescimentoPercentual = None
@@ -1095,14 +1081,17 @@ def calcularCrescimentoIncidentes(historicoAlertas, empresa, datacenter):
         elif crescimentoPercentual < 0:
             valorFormatado = f"{round(crescimentoPercentual, 2)}%"
             tendencia = "queda"
-
         else:
             valorFormatado = "0%"
             tendencia = "estável"
 
+    percentualRetorno = (
+        None if crescimentoPercentual is None
+        else round(crescimentoPercentual, 2)
+    )
 
     return {
-        "percentual": round(crescimentoPercentual, 2),
+        "percentual": percentualRetorno,
         "valorFormatado": valorFormatado,
         "alertasSemanaAtual": alertasSemanaAtual,
         "alertasSemanaAnterior": alertasSemanaAnterior,
@@ -1148,7 +1137,6 @@ def dashOperacional(dados, geral, bucket):
 
     df = pd.DataFrame(dados)
 
-
     if df.empty:
         print("⚠️ DataFrame vazio")
         return {
@@ -1158,14 +1146,14 @@ def dashOperacional(dados, geral, bucket):
         }
 
     df["DATE"] = pd.to_datetime(df["DATE"])
+
     historicoAlertas = carregarHistoricoAlertas(bucket)
 
     fimPeriodoUptime = datetime.now()
     inicioPeriodoUptime = fimPeriodoUptime - timedelta(days=7)
-    chamadosCriticosUptime = carregarChamadosCriticosUptime(
-    inicioPeriodoUptime,
-    fimPeriodoUptime
-)
+
+    chamadosJson = carregarChamadosJson(bucket)
+
     resultado = {}
 
     for (empresa, datacenter), df_dc in df.groupby(["EMPRESA", "DATACENTER"]):
@@ -1175,11 +1163,13 @@ def dashOperacional(dados, geral, bucket):
         graficoAlertasSemana = calcularAlertaSemana(
             historicoAlertas,
             empresa,
-            datacenter)
-        
+            datacenter
+        )
+
         zonas = []
         servidores_datacenter = []
         uptimeServidores = []
+
         for zona, df_zona in df_dc.groupby("ZONA"):
 
             print(f"\n📍 ZONA: {zona}")
@@ -1192,16 +1182,16 @@ def dashOperacional(dados, geral, bucket):
 
                 try:
                     info_servidor = geral[empresa][datacenter][zona][servidor]
-                    limites = info_servidor.gkpiUptime = calcularKpiUptime(uptimeServidores)et("limites", {})
+                    limites = info_servidor.get("limites", {})
 
                     print("✅ Limites encontrados:", limites)
 
                 except (KeyError, TypeError):
                     limites = {}
-
                     print("⚠️ Limites não encontrados. Usando fallback.")
-                chamadosServidor = filtrarChamadosServidor(
-                    chamadosCriticosUptime,
+
+                chamadosServidor = obterChamadosServidor(
+                    chamadosJson,
                     empresa,
                     datacenter,
                     zona,
@@ -1215,9 +1205,10 @@ def dashOperacional(dados, geral, bucket):
                     inicioPeriodoUptime,
                     fimPeriodoUptime
                 )
-                uptimeServidores.append(resultadoUptime)
-                df_servidor = df_servidor.sort_values("DATE")
 
+                uptimeServidores.append(resultadoUptime)
+
+                df_servidor = df_servidor.sort_values("DATE")
                 coletaServidor = df_servidor.to_dict(orient="records")
 
                 print(f"📦 Quantidade de coletas: {len(coletaServidor)}")
@@ -1283,14 +1274,6 @@ def dashOperacional(dados, geral, bucket):
             servidores_datacenter
         )
 
-        print("🏆 TOP 5 SERVIDORES CRÍTICOS:")
-        for srv in rankingSrvCriticosTop5:
-            print(
-                f"➡️ {srv['servidor']} | "
-                f"Score: {srv['score']} | "
-                f"Status: {srv['status']}"
-            )
-
         kpiUptime = calcularKpiUptime(uptimeServidores)
 
         resultado.setdefault(empresa, {})
@@ -1309,7 +1292,6 @@ def dashOperacional(dados, geral, bucket):
             "kpiUptime": kpiUptime,
             "kpiCrescimentoIncidentes": kpiCrescimentoIncidentes,
             "kpiServidoresCriticos": kpiServidoresCriticos
-
         }
 
         print(f"✅ JSON FINAL DO DATACENTER {datacenter} CRIADO")
@@ -1321,4 +1303,3 @@ def dashOperacional(dados, geral, bucket):
         "total_dados": len(dados),
         "datacenters": resultado
     }
-
