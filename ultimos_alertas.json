@@ -1,0 +1,34 @@
+{
+    "Steam": {
+        "DC01-SP": {
+            "Zona Alpha": {
+                "QUANTIDADE_ABERTO": 0,
+                "MTTR_ZONA": 0,
+                "SRV-DC01-WEB-05": {
+                    "idServidor": 1,
+                    "chamados": {}
+                },
+                "SRV-DC01-DB-12": {
+                    "idServidor": 2,
+                    "chamados": {}
+                },
+                "SRV-FK02-GM-02": {
+                    "idServidor": 3,
+                    "chamados": {}
+                },
+                "SRV-DC01-WEB-08": {
+                    "idServidor": 4,
+                    "chamados": {}
+                }
+            },
+            "Zona Beta": {
+                "QUANTIDADE_ABERTO": 0,
+                "MTTR_ZONA": 0
+            },
+            "Zona Omega": {
+                "QUANTIDADE_ABERTO": 0,
+                "MTTR_ZONA": 0
+            }
+        }
+    }
+}

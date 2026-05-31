@@ -1,0 +1,89 @@
+{
+    "Steam": {
+        "DC01-SP": {
+            "Zona Alpha": {
+                "SRV-DC01-WEB-05": {
+                    "tipo": "Web",
+                    "estado": "Ativo",
+                    "idServidor": 1,
+                    "idDataCenter": 1,
+                    "limites": {
+                        "CPU": 90.0,
+                        "RAM": 16.0,
+                        "DISCO": 450.0,
+                        "REDE": 40.0
+                    },
+                    "limiteIds": {
+                        "CPU": 1,
+                        "RAM": 2,
+                        "DISCO": 3,
+                        "REDE": 4
+                    },
+                    "funcionarios": []
+                },
+                "SRV-DC01-DB-12": {
+                    "tipo": "DB",
+                    "estado": "Ativo",
+                    "idServidor": 2,
+                    "idDataCenter": 1,
+                    "limites": {
+                        "CPU": 90.0,
+                        "RAM": 16.0,
+                        "DISCO": 450.0,
+                        "REDE": 40.0
+                    },
+                    "limiteIds": {
+                        "CPU": 1,
+                        "RAM": 2,
+                        "DISCO": 3,
+                        "REDE": 4
+                    },
+                    "funcionarios": []
+                },
+                "SRV-FK02-GM-02": {
+                    "tipo": "GM",
+                    "estado": "Ativo",
+                    "idServidor": 3,
+                    "idDataCenter": 1,
+                    "limites": {
+                        "CPU": 90.0,
+                        "RAM": 16.0,
+                        "DISCO": 450.0,
+                        "REDE": 40.0
+                    },
+                    "limiteIds": {
+                        "CPU": 1,
+                        "RAM": 2,
+                        "DISCO": 3,
+                        "REDE": 4
+                    },
+                    "funcionarios": []
+                },
+                "SRV-DC01-WEB-08": {
+                    "tipo": "WEB",
+                    "estado": "Ativo",
+                    "idServidor": 4,
+                    "idDataCenter": 1,
+                    "limites": {
+                        "CPU": 90.0,
+                        "RAM": 16.0,
+                        "DISCO": 450.0,
+                        "REDE": 40.0
+                    },
+                    "limiteIds": {
+                        "CPU": 1,
+                        "RAM": 2,
+                        "DISCO": 3,
+                        "REDE": 4
+                    },
+                    "funcionarios": [
+                        {
+                            "id": 2,
+                            "nome": "Erick Analista"
+                        }
+                    ]
+                }
+            }
+        }
+    }
+}
