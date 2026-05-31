@@ -286,25 +286,20 @@ def capturaCSV(servidor):
         #LATÊNCIA
         latencia_base = ping_real
 
-
-        # TEM UM ERRO AQUI!!!!!!!!
-        """
         if latencia_base <= 0:
             latencia_base = random.uniform(8, 25)
 
-        if dia == 5 and 18 <= hora <= 23:
-            latencia_negocio = limitar(latencia_negocio, 25, 120)
-        else:
-            latencia_negocio = limitar(latencia_negocio, 5, 500)
         if manutencao:
             latencia_negocio = latencia_base * random.uniform(6, 12)
         else:
             latencia_negocio = latencia_base * fator_hora * fator_latencia_dia[dia]
             latencia_negocio += random.uniform(-2, 4)
-"""
 
-        latencia_negocio = latencia_base
-        latencia_negocio = limitar(latencia_negocio, 5, 500)
+        # sábado à noite: pico de jogadores
+        if dia == 5 and 18 <= hora <= 23:
+            latencia_negocio = limitar(latencia_negocio, 25, 120)
+        else:
+            latencia_negocio = limitar(latencia_negocio, 5, 500)
 
         #PACOTES
         pacotes_enviados_negocio = int(pacotes_enviados * (1 + ((fator_hora - 1) * 0.20)))
