@@ -16,6 +16,9 @@ def lambda_handler(event, context):
         bucket = registro["bucket"]["name"]
         if key.lower().endswith(".json"):
             return {"statusCode": 200, "body": f"Arquivo JSON ignorado: {key}"}
+        if key != "trusted/dados_tratados.csv":
+            print(f"Ignorando arquivo que não é o trusted principal: {key}")
+            return {"statusCode": 200, "body": f"Arquivo ignorado: {key}"}
         
         
         resultado = dashFinanceiro(event, context)
@@ -134,17 +137,43 @@ def dashFinanceiro(event, context):
         if coluna in df.columns:
             df[coluna] = pd.to_numeric(df[coluna], errors='coerce').fillna(0)
 
-    df['DATE'] = pd.to_datetime(df['DATE'], errors='coerce')
+    df['DATE'] = pd.to_datetime(df['DATE'], errors='coerce', format='mixed')
+
+    print("Total antes de remover DATE inválida:", len(df))
+    print("Datas inválidas:", df['DATE'].isna().sum())
+
     df = df.dropna(subset=['DATE'])
+
+    print("Total depois de remover DATE inválida:", len(df))
+    print("Menor DATE lida:", df['DATE'].min())
+    print("Maior DATE lida:", df['DATE'].max())
+    
     df['MES'] = df['DATE'].dt.to_period('M').astype(str)
     df['DATE_5MIN'] = df['DATE'].dt.floor('5min')
 
+    df = df.sort_values(['EMPRESA', 'DATACENTER', 'ZONA', 'SERVIDOR', 'DATE'])
+
+    df['PACOTES_ENV_DELTA'] = (
+        df.groupby(['EMPRESA', 'DATACENTER', 'ZONA', 'SERVIDOR'])['PACOTES_ENV']
+        .diff()
+    )
+
+    df['PACOTES_RCB_DELTA'] = (
+        df.groupby(['EMPRESA', 'DATACENTER', 'ZONA', 'SERVIDOR'])['PACOTES_RCB']
+        .diff()
+    )
+
+    df['PACOTES_ENV_DELTA'] = df['PACOTES_ENV_DELTA'].where(df['PACOTES_ENV_DELTA'] >= 0, 0).fillna(0)
+    df['PACOTES_RCB_DELTA'] = df['PACOTES_RCB_DELTA'].where(df['PACOTES_RCB_DELTA'] >= 0, 0).fillna(0)
+
 
     # ── RECEITA ~~~~~~~~~~~~~~~~~~
-    RECEITA_POR_JOGADOR_5MIN = 0.15
+    RECEITA_POR_JOGADOR_5MIN = 0.105
     INTERVALOS_MES = 30 * 24 * 12
 
     efetivos = df['JOGADORES_ATIVOS'].astype(float)
+    efetivos = np.where(efetivos > 10000, efetivos / 10000, efetivos)
+    df['JOGADORES_ATIVOS_AJUSTADO'] = efetivos
     fator_latencia = np.select(
         [
             df['LATENCIA'] > 500,
@@ -199,21 +228,23 @@ def dashFinanceiro(event, context):
 
         #CUSTO VARIAVEL 
     #ENERGIA
-    POTENCIA_MIN_W     = 500
-    POTENCIA_MAX_W     = 1500
-    TARIFA_KWH         = 0.90
+    POTENCIA_MIN_W = 6000
+    POTENCIA_MAX_W = 18000
+    TARIFA_KWH = 2.20
     MARGEM_ORCAMENTO = 0.05 
+    CUSTO_OPERACIONAL_POR_JOGADOR_5MIN = 0.006
 
     fator_carga = (cpu * PESO_CPU_ENERGIA) + (ram * PESO_RAM_ENERGIA) + (disco * PESO_DISCO_ENERGIA)
     potencia_w = POTENCIA_MIN_W + (POTENCIA_MAX_W - POTENCIA_MIN_W) * fator_carga
     energia_kwh = (potencia_w / 1000) * 5 / 60
     
     #REDE
-    CUSTO_BANDA_POR_PACOTE = 0.0035 
-    custo_rede = (df['PACOTES_ENV'] + df['PACOTES_RCB']) * CUSTO_BANDA_POR_PACOTE
+    CUSTO_BANDA_POR_PACOTE = 0.0035
+    custo_rede = (df['PACOTES_ENV_DELTA'] + df['PACOTES_RCB_DELTA']) * CUSTO_BANDA_POR_PACOTE
+    custo_jogadores = df['JOGADORES_ATIVOS_AJUSTADO'] * CUSTO_OPERACIONAL_POR_JOGADOR_5MIN
     
 
-    df['CUSTO_VAR_5MIN'] = (energia_kwh * TARIFA_KWH + custo_rede)
+    df['CUSTO_VAR_5MIN'] = (energia_kwh * TARIFA_KWH + custo_rede + custo_jogadores)
 
     # ── UNIFICANDO ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     df_financeiro = (
@@ -227,15 +258,15 @@ def dashFinanceiro(event, context):
             QTD_SERVIDORES = ('SERVIDOR',      'nunique'),
             CUSTO_VAR_5MIN = ('CUSTO_VAR_5MIN', 'sum'), 
             RECEITA_5MIN   = ('RECEITA_5MIN',  'sum'),
-            JOGADORES_SIM  = ('JOGADORES_ATIVOS', 'sum')
+            JOGADORES_SIM  = ('JOGADORES_ATIVOS_AJUSTADO', 'mean')
         )
         .reset_index()
     )
     # ── FINALIZNADO CUSTO ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
         #CUSTO FIXO
-    CUSTO_GLOBAL_5MIN = (4500.00 + 5000.00) / INTERVALOS_MES  # Licença e DevOps 
-    CUSTO_HW_5MIN     = 4500.00 / INTERVALOS_MES              # Hardware (Pago por Servidor ligado)
+    CUSTO_GLOBAL_5MIN = (20000.00 + 25000.00) / INTERVALOS_MES  # Licença e DevOps 
+    CUSTO_HW_5MIN = 45000.00 / INTERVALOS_MES              # Hardware (Pago por Servidor ligado)
     
     df_financeiro['CUSTO_5MIN'] = ( CUSTO_GLOBAL_5MIN + (df_financeiro['QTD_SERVIDORES'] * CUSTO_HW_5MIN) + df_financeiro['CUSTO_VAR_5MIN']
     ).round(2)
@@ -304,6 +335,7 @@ def dashFinanceiro(event, context):
     xs = list(range(1, n_meses + 1))
     r2_custo  = float(calcularR2(xs,  lista_custo,   modelo_custo)) if modelo_custo else None
     mae_custo = float(calcularMAE(xs, lista_custo,   modelo_custo)) if modelo_custo else None
+    mae_receita = float(calcularMAE(xs, lista_receita, modelo_receita)) if modelo_custo else None
     r2_rec    = float(calcularR2(xs,  lista_receita, modelo_receita)) if modelo_receita else None
 
     # Projeção do próximo mês (x = n_meses + 1)
@@ -322,7 +354,34 @@ def dashFinanceiro(event, context):
     print("R² Custo : ", r2_custo)
     print("R² Receita : ", r2_rec)
 
-    # ── GRÁFICO DONUT — Distribuição de custos por categoria (mês corrente) ──
+
+    #HISTORICO 24HRS
+    agora = df_financeiro['DATE_5MIN'].max()
+    corte_24h = agora - pd.Timedelta(hours=24)
+    df_24h = df_financeiro[df_financeiro['DATE_5MIN'] >= corte_24h].copy()
+
+    df_24h['HORA'] = df_24h['DATE_5MIN'].dt.floor('h')
+
+    historico_24h = (
+        df_24h.groupby('HORA')
+        .agg(
+            CUSTO_HORA = ('CUSTO_5MIN', 'sum'),
+            RECEITA_HORA = ('RECEITA_5MIN', 'sum'),
+            MEDIA_JOGADORES = ('JOGADORES_SIM', 'mean')
+        )
+        .reset_index()
+    )
+    resumo_24H = [
+        {
+            "hora": row["HORA"].strftime('%Y-%m-%d %H:00'),
+            "custo": float(round(row["CUSTO_HORA"], 2)),
+            "receita": float(round(row["RECEITA_HORA"], 2)),
+            "jogadores_media": float(round(row["MEDIA_JOGADORES"], 2))
+        }
+        for _, row in historico_24h.iterrows()
+    ]
+
+    # GRÁFICO DONUT — Distribuição de custos por categoria (mês corrente)
     energia_mes = float(round(df_mes_corr.merge(
         df[['DATE_5MIN', 'SERVIDOR']].assign(
             ENERGIA = (((POTENCIA_MIN_W + (POTENCIA_MAX_W - POTENCIA_MIN_W) *
@@ -345,7 +404,7 @@ def dashFinanceiro(event, context):
         "fixo_global": global_mes
     }
     
-   # ── GRÁFICO BARRAS — Custo por datacenter e zona (mês corrente) ──
+   # GRÁFICO BARRAS Custo por datacenter e zona (mês corrente)
     df_mes_completo = df[df['MES'] == mes_corrente].copy()
     
     
@@ -356,7 +415,7 @@ def dashFinanceiro(event, context):
            (df_mes_completo['DISCO_PER']/100 * PESO_DISCO_ENERGIA))) / 1000) * (5/60) * TARIFA_KWH
     )
     
-    df_mes_completo['CUSTO_VAR'] = df_mes_completo['CUSTO_ENERGIA'] + (df_mes_completo['PACOTES_ENV'] + df_mes_completo['PACOTES_RCB']) * CUSTO_BANDA_POR_PACOTE
+    df_mes_completo['CUSTO_VAR'] = df_mes_completo['CUSTO_ENERGIA'] + (df_mes_completo['PACOTES_ENV_DELTA'] + df_mes_completo['PACOTES_RCB_DELTA']) * CUSTO_BANDA_POR_PACOTE + (df_mes_completo['JOGADORES_ATIVOS_AJUSTADO'] * CUSTO_OPERACIONAL_POR_JOGADOR_5MIN)
    
     qtd_servidores_intervalo = df_mes_completo.groupby('DATE_5MIN')['SERVIDOR'].transform('nunique')
     df_mes_completo['CUSTO_TOTAL_LINHA'] = df_mes_completo['CUSTO_VAR'] + CUSTO_HW_5MIN + (CUSTO_GLOBAL_5MIN / qtd_servidores_intervalo)
@@ -377,25 +436,47 @@ def dashFinanceiro(event, context):
         .to_dict(orient='records')
     )
     
-    # ── TABELA — Top servidores por custo (mês corrente) ──
+    # TABELA Top servidores por custo (mês corrente)
     custos_servidor = df_mes_completo.groupby(['SERVIDOR', 'DATACENTER', 'ZONA'])[['CUSTO_VAR', 'CUSTO_ENERGIA']].sum()
     
     top_servidores = (
         custos_servidor
         .reset_index()
-        .rename(columns={'CUSTO_VAR': 'custo', 'CUSTO_ENERGIA': 'custo_energia'})
+        .rename(columns={'SERVIDOR': 'servidor', 'CUSTO_VAR': 'custo', 'CUSTO_ENERGIA': 'custo_energia'})
         .assign(
             custo         = lambda x: x['custo'].round(2),
             custo_energia = lambda x: x['custo_energia'].round(2),
-            percentual    = lambda x: (x['custo'] / x['custo'].sum() * 100).round(1),
-            datacenter    = lambda x: x['DATACENTER'].astype(str).str.split('-').str[0],
-            zona          = lambda x: x['ZONA']
+            percentual = lambda x: (x['custo'] / x['custo'].sum() * 100).round(1),
+            datacenter = lambda x: x['DATACENTER'].astype(str).str.split('-').str[0],
+            zona = lambda x: x['ZONA'],
+            status = lambda x: 'ativo'
         )
         .sort_values('custo', ascending=False)
+        [['servidor', 'datacenter', 'zona', 'custo', 'custo_energia', 'percentual', 'status']]
+        .to_dict(orient='records')
+    )
+    zonas_agg = df_mes_completo.groupby(['DATACENTER', 'ZONA']).agg(
+        servidores  = ('SERVIDOR', 'nunique'),
+        custo_total = ('CUSTO_TOTAL_LINHA', 'sum'),
+        energia     = ('CUSTO_ENERGIA', 'sum')
+    ).reset_index()
+
+    top_zonas = (
+        zonas_agg
+        .assign(
+            datacenter  = lambda x: x['DATACENTER'].astype(str).str.split('-').str[0],
+            zona        = lambda x: x['ZONA'],
+            custo_total = lambda x: x['custo_total'].round(2),
+            energia     = lambda x: x['energia'].round(2),
+            fatia_custo = lambda x: x['custo_total'] / x['custo_total'].sum(),
+            status      = lambda x: 'ativo'
+        )
+        .sort_values('custo_total', ascending=False)
+        [['zona', 'datacenter', 'servidores', 'custo_total', 'energia', 'status']] 
         .to_dict(orient='records')
     )
     
-    # ── CARDS PREDITIVOS — Projeção de 12 meses futuros ──
+    # ── CARDS PREDITIVOS ──
     periodo_base = pd.Period(mes_corrente, 'M')
     projecoes = []
     for i in range(1, 13):
@@ -445,24 +526,27 @@ def dashFinanceiro(event, context):
             "N_MESES_HISTORICO": n_meses,
             "R2_CUSTO":  r2_custo,
             "MAE_CUSTO": mae_custo,
+            "MAE_RECEITA": mae_receita,
             "R2_RECEITA": r2_rec,
             "COEFI_ANGULAR_CUSTO": float(round(modelo_custo["CoeficienteAngular"],   2)) if modelo_custo   else None,
             "COEFI_ANGULAR_RECEITA": float(round(modelo_receita["CoeficienteAngular"], 2)) if modelo_receita else None,
         },
         "HISTORICO_MENSAL": [
             {
-                "mes":     row["MES"],
-                "custo":  float(round(row["CUSTO_MES"],   2)),
+                "mes": row["MES"],
+                "custo":  float(round(row["CUSTO_MES"], 2)),
                 "receita": float(round(row["RECEITA_MES"], 2)),
                 "roi": float(round(((row["RECEITA_MES"] - row["CUSTO_MES"]) / row["CUSTO_MES"]) * 100, 2))
                            if row["CUSTO_MES"] > 0 else 0.0
             }
             for _, row in historico_mensal.iterrows()
         ],
+        "HISTORICO_24HRS":resumo_24H,
         "GRAFICOS": {
             "DONUT_CUSTOS":      donut_custos,
             "BARRAS_DATACENTER": barras_datacenter,
             "TOP_SERVIDORES":    top_servidores,
+            "TOP_ZONAS":         top_zonas
         },
         "PROJECOES": projecoes,
         "total_dados": len(df)

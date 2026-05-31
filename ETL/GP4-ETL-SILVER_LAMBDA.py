@@ -107,6 +107,12 @@ def TrustedCsv(event, context):
     df = pd.read_csv(caminho_local_entrada, delimiter=";", encoding="utf-8-sig")
     df.columns = df.columns.str.strip()
 
+    # --- NOVA REGRA: Pegar apenas as últimas 30 linhas ---
+    df = df.tail(30)
+    
+    # Remover duplicatas que já existam dentro dessas 30 linhas exatas
+    df = df.drop_duplicates()
+
     # Tratamento da Data do psutil 
     df["DATA_HORA"] = pd.to_datetime(df["DATA_HORA"])
 

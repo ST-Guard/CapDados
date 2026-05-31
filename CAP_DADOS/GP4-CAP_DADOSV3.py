@@ -16,7 +16,7 @@ import random
 
 
 arquivo_csv = "dados-brutos_maquina.csv"
-bucket_name = 's3-testesmartheloisy'
+bucket_name = 'smartdatabucket2'
 
 #STE12345
 #SRV-DC01-WEB-05
@@ -33,7 +33,7 @@ print("""\033[33m
 
 \033[m""")
 
-load_dotenv('dadinhos/CapDados/CAP_DADOS/.env.dev')
+load_dotenv()
 print("=== VERIFICANDO VARIÁVEIS DE AMBIENTE ===")
 print(f"DB_HOST: {os.getenv('DB_HOST')}")
 print(f"DB_USER: {os.getenv('DB_USER')}")
@@ -376,7 +376,7 @@ def capturaCSV(servidor):
 
         # API Steam 
         jogadores_globais  = buscarJogadoresAtivos()
-        jogadores_nossos = round(jogadores_globais * 0.3, 2)
+        jogadores_nossos = round((jogadores_globais * 0.3) / TOTAL_SERVIDORES_STEAM, 2)
 
 
 
@@ -817,7 +817,7 @@ if servidor:
     cont = -1
     while True:
         capturaCSV(servidor)
-        time.sleep(10)
+        time.sleep(30)
 
         if (cont == 30 or cont == -1):
             cont = 0
