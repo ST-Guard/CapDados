@@ -33,7 +33,7 @@ print("""\033[33m
 
 \033[m""")
 
-load_dotenv('CapDados/CAP_DADOS/.env.dev')
+load_dotenv('venvPI/CapDados/CAP_DADOS/.env.dev')
 print("=== VERIFICANDO VARIÁVEIS DE AMBIENTE ===")
 print(f"DB_HOST: {os.getenv('DB_HOST')}")
 print(f"DB_USER: {os.getenv('DB_USER')}")
@@ -500,7 +500,7 @@ def capturaJson():
             e.idEmpresa,
             e.razaoSocial AS empresa,
             r.idRegiao,
-            r.estado,
+            r.cidade,
             r.cep,
             r.numero,
             r.uf,
