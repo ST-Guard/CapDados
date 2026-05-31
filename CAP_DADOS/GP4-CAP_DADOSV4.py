@@ -33,7 +33,7 @@ print("""\033[33m
 
 \033[m""")
 
-load_dotenv('dadinhos/CapDados/CAP_DADOS/.env.dev')
+load_dotenv('CapDados/CAP_DADOS/.env.dev')
 print("=== VERIFICANDO VARIÁVEIS DE AMBIENTE ===")
 print(f"DB_HOST: {os.getenv('DB_HOST')}")
 print(f"DB_USER: {os.getenv('DB_USER')}")
@@ -804,12 +804,25 @@ JOIN registros_alertas ON fkRegistroServidor = idServidor WHERE z.idZona = {id_z
 
     # pegando os dados dos alertas/mttr
 
+def contar_linhas_csv(caminho_csv):
+    if not os.path.exists(caminho_csv):
+        return 0
+
+    with open(caminho_csv, "r", encoding="utf-8") as arquivo:
+        linhas = arquivo.readlines()
+
+    if len(linhas) == 0:
+        return 0
+
+    return len(linhas) - 1
 
 servidor = validarServidor()
 
 if servidor:
     cont_json = -1
-    cont_linhas_csv = 0
+
+    arquivo_csv_servidor = f"dados-brutos-{servidor[0][1]}.csv"
+    cont_linhas_csv = contar_linhas_csv(arquivo_csv_servidor) % 30
 
     while True:
         cont_linhas_csv += 1
@@ -830,6 +843,3 @@ if servidor:
         cont_json += 1
 else:
     print("Erro na validação")
-
-
-    

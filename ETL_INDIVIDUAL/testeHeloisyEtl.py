@@ -967,7 +967,7 @@ def carregarChamadosJson(bucket):
 
         resposta = s3.get_object(
             Bucket=bucket,
-            Key="raw/chamados.json"
+            Key="dados_alertas/ultimos_alertas.json"
         )
 
         conteudo = resposta["Body"].read().decode("utf-8")
