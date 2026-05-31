@@ -16,7 +16,7 @@ import random
 
 
 arquivo_csv = "dados-brutos_maquina.csv"
-bucket_name = 's3-'
+bucket_name = 'smartdatabucket-17-04'
 
 #STE12345
 #SRV-DC01-WEB-05
@@ -33,7 +33,7 @@ print("""\033[33m
 
 \033[m""")
 
-load_dotenv('venvPI/CapDados/.env.dev')
+load_dotenv()
 print("=== VERIFICANDO VARIÁVEIS DE AMBIENTE ===")
 print(f"DB_HOST: {os.getenv('DB_HOST')}")
 print(f"DB_USER: {os.getenv('DB_USER')}")
@@ -41,9 +41,9 @@ print(f"DB_PASSWORD: {'******' if os.getenv('DB_PASSWORD') else 'NÃO ENCONTRADA
 print(f"DB_NAME: {os.getenv('DB_NAME')}")
 print("==========================================")
 
-chave_acesso = os.getenv('AWS_ACCESS_KEY_ID')
-chave_secreta = os.getenv('AWS_SECRET_ACCESS_KEY')
-token_sessao = os.getenv('AWS_SESSION_TOKEN')
+chave_acesso = os.getenv('aws_access_key_id')
+chave_secreta = os.getenv('aws_secret_access_key')
+token_sessao = os.getenv('aws_session_token')
 
 # Banco de Dados
 banco_host = os.getenv('DB_HOST')
@@ -286,6 +286,9 @@ def capturaCSV(servidor):
         #LATÊNCIA
         latencia_base = ping_real
 
+
+        # TEM UM ERRO AQUI!!!!!!!!
+        """
         if latencia_base <= 0:
             latencia_base = random.uniform(8, 25)
 
@@ -298,7 +301,9 @@ def capturaCSV(servidor):
         else:
             latencia_negocio = latencia_base * fator_hora * fator_latencia_dia[dia]
             latencia_negocio += random.uniform(-2, 4)
+"""
 
+        latencia_negocio = latencia_base
         latencia_negocio = limitar(latencia_negocio, 5, 500)
 
         #PACOTES
@@ -608,7 +613,210 @@ def capturaJson():
     upload_file(caminho_json, bucket_name, nome_arquivo_json)
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # pegando os dados das empresas
+
+    cursor = conexao_json.cursor()
+
+    query_empresas = "SELECT * FROM empresa"
+    cursor.execute(query_empresas)
+    emrpesas = cursor.fetchall()
+
+    dados_alertas = {}
+    for empresa in emrpesas:
+        
+
+        id_empresa = empresa[0]
+        nome_empresa = empresa[1]
+
+        query_datacenters = f"SELECT * FROM datacenter JOIN regiao ON fkRegiaoDataCenter = idDatacenter JOIN empresa ON fkRegiaoEmpresa = idEmpresa WHERE fkRegiaoEmpresa = {id_empresa};"
+        cursor.execute(query_datacenters)
+        datacenters  = cursor.fetchall()
+
+
+   
+
+        existe_empresa_no_json = False
+
+    
+        for dados in dados_alertas:
+      
+            if dados == nome_empresa:
+                existe_empresa_no_json = True
+
+        if existe_empresa_no_json == False:
+            dados_alertas[nome_empresa] = {}
+
+        
+
+        
+
+        for datacenter in datacenters:
+
+            nome_datacenter = datacenter[1]
+
+            id_datacenter = datacenter[0]
+
+            query_zonas = f"SELECT * FROM zona WHERE fkDataCenter = {id_datacenter};"
+            cursor.execute(query_zonas)
+            zonas = cursor.fetchall()
+
+
+            dados_alertas[nome_empresa][nome_datacenter] = {}
+
+            for zona in zonas:
+                        id_zona = zona[0]
+                        nome_zona = zona[1]
+
+                  
+
+                        query_servidores = f"SELECT * FROM servidor WHERE fkZona = {id_zona};"
+                        cursor.execute(query_servidores)
+                        servidores = cursor.fetchall()
+
+
+
+                        query_mttr_z = f"""SELECT z.nome, count(z.idZona) as "Quantidade de alertas em aberto" FROM zona z 
+                        JOIN servidor ON fkZona = z.idZona 
+                        JOIN registros_alertas ON fkRegistroServidor = idServidor   WHERE resolvido_em is null and z.idZona = {id_zona} GROUP BY z.nome;"""
+                        cursor.execute(query_mttr_z)
+                        quantidade_aberto = cursor.fetchall()
+
+
+                        
+
+                        query_mttr_zona = f"""
+SELECT z.nome, AVG(mttr_minutos) FROM zona z 
+JOIN servidor ON fkZona = z.idZona 
+JOIN registros_alertas ON fkRegistroServidor = idServidor WHERE z.idZona = {id_zona} GROUP BY z.nome;
+
+"""
+                        cursor.execute(query_mttr_zona)
+                        mttr = cursor.fetchall()
+
+                        quantidade_alerta = 0
+                        if len(quantidade_aberto) == 0:
+                            quantidade_alerta = 0
+                        else :
+                            quantidade_alerta = quantidade_aberto[0][1]
+
+                        mttr_m = ""
+
+
+                        
+                        if len(mttr) == 0:
+                            mttr_m = 0
+                        else:
+                            mttr_m = mttr[0][1]
+
+
+
+                        dados_alertas[nome_empresa][nome_datacenter][nome_zona] = {
+                            "QUANTIDADE_ABERTO": quantidade_alerta,
+                            "MTTR_ZONA": mttr_m
+
+                        }
+
+                        for servidor in servidores:
+                                
+                                id_servidor = servidor[0]
+                                nome_servidor = servidor[1] 
+                   
+
+
+                                query_alerta = f"SELECT r.*, c.nome FROM registros_alertas r JOIN componentes c ON idComponente = r.fkRegistroComponente WHERE  r.fkRegistroServidor = {id_servidor}  AND r.dataHora >= DATE_SUB(NOW(), INTERVAL 7 DAY); "
+                                cursor.execute(query_alerta)
+                                alerta_servidor = cursor.fetchall()
+
+                                alerta_servidor_dicionario = {
+
+                                }
+
+
+                                for alerta in alerta_servidor:
+                              
+
+
+                                    status_chamado = ""
+                                    if alerta[7] == None:
+                                        status_chamado = "aberto"
+                                    else:
+                                        status_chamado = "fechado"
+
+
+
+                                    fechamento = ""
+                                    if alerta[7] == None:
+                                        fechamento = "none"
+                                    else:
+                                        fechamento = alerta[7].strftime('%d/%m/%Y %H:%M')
+
+
+                                    duracao = ""
+
+                                    if alerta[8] == None:
+                                        duracao = "em_aberto"
+                                    else:
+                                        duracao = alerta[8]
+
+
+                            
+
+
+
+                                    alerta_servidor_dicionario[alerta[0]] = {
+                                        "id_alerta": alerta[0],
+                                        "componente": alerta[13],
+                                        "status": status_chamado,
+                                        "abertura": alerta[6].strftime('%d/%m/%Y %H:%M'),
+                                        "fechamento": fechamento,
+                                        "duracao": duracao
+
+                                    }
+
+
+                                dados_alertas[nome_empresa][nome_datacenter][nome_zona][nome_servidor] = {
+                                        "idServidor": id_servidor,
+                                        "chamados": alerta_servidor_dicionario
+                                }
+
+
+    geral_json = json.dumps(dados_alertas, ensure_ascii=False, indent=4, default=str)
+
+    caminho_json = "ultimos_alertas.json"
+
+    with open(caminho_json, "w", encoding="utf-8") as arquivo:
+        arquivo.write(geral_json)
+
+    nome_arquivo_json = "dados_alertas/ultimos_alertas.json"
+    print("Enviando os ultimos alertas")
+    upload_file(caminho_json, bucket_name, nome_arquivo_json)
+
+
+    # pegando os dados dos alertas/mttr
+
+
 servidor = validarServidor()
+
+
+
+
+
+
+    
 
 if servidor:
     cont = -1
@@ -622,3 +830,11 @@ if servidor:
         cont += 1
 else:
     print("Erro na validação")
+
+
+
+
+
+
+
+    
