@@ -138,12 +138,21 @@ def dashFinanceiro(event, context):
             df[coluna] = pd.to_numeric(df[coluna], errors='coerce').fillna(0)
 
     df['DATE'] = pd.to_datetime(df['DATE'], errors='coerce', format='mixed')
+
+    print("Total antes de remover DATE inválida:", len(df))
+    print("Datas inválidas:", df['DATE'].isna().sum())
+
     df = df.dropna(subset=['DATE'])
+
+    print("Total depois de remover DATE inválida:", len(df))
+    print("Menor DATE lida:", df['DATE'].min())
+    print("Maior DATE lida:", df['DATE'].max())
     
     df['MES'] = df['DATE'].dt.to_period('M').astype(str)
     df['DATE_5MIN'] = df['DATE'].dt.floor('5min')
 
     df = df.sort_values(['EMPRESA', 'DATACENTER', 'ZONA', 'SERVIDOR', 'DATE'])
+
     df['PACOTES_ENV_DELTA'] = (
         df.groupby(['EMPRESA', 'DATACENTER', 'ZONA', 'SERVIDOR'])['PACOTES_ENV']
         .diff()
@@ -209,11 +218,11 @@ def dashFinanceiro(event, context):
     ).round(2)
 
     # ── CUSTO ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    cpu = df['CPU_PER'] / 100
-    ram = df['RAM_PER'] / 100
+    cpu = df['CPU_PER']   / 100
+    ram = df['RAM_PER']   / 100
     disco = df['DISCO_PER'] / 100
-    PESO_CPU_ENERGIA = 0.75
-    PESO_RAM_ENERGIA = 0.35
+    PESO_CPU_ENERGIA   = 0.75
+    PESO_RAM_ENERGIA   = 0.35
     PESO_DISCO_ENERGIA = 0.20
 
 
@@ -399,6 +408,7 @@ def dashFinanceiro(event, context):
    # GRÁFICO BARRAS Custo por datacenter e zona (mês corrente)
     df_mes_completo = df[df['MES'] == mes_corrente].copy()
     
+    
     df_mes_completo['CUSTO_ENERGIA'] = (
         ((POTENCIA_MIN_W + (POTENCIA_MAX_W - POTENCIA_MIN_W) *
           ((df_mes_completo['CPU_PER']/100 * PESO_CPU_ENERGIA) +
@@ -421,7 +431,7 @@ def dashFinanceiro(event, context):
         .reset_index()
         .assign(
             custo = lambda x: x['custo'].round(2),
-            roi = lambda x: np.where(x['custo_total'] > 0, ((x['receita'] - x['custo_total']) / x['custo_total'] * 100).round(2), 0.0)
+            roi   = lambda x: np.where(x['custo_total'] > 0, ((x['receita'] - x['custo_total']) / x['custo_total'] * 100).round(2), 0.0)
         )
         .drop(columns=['custo_total', 'receita'])
         .to_dict(orient='records')
@@ -491,21 +501,21 @@ def dashFinanceiro(event, context):
             ajuste_sazonal_receita = 0
         c_prev_base = float(forecastLinear(modelo_custo,   x_i)) if modelo_custo   else None
         r_prev_base = float(forecastLinear(modelo_receita, x_i)) if modelo_receita else None
-        c_prev = float(round(max(0, c_prev_base + ajuste_sazonal_custo), 2)) if c_prev_base is not None else None
-        r_prev = float(round(max(0, r_prev_base + ajuste_sazonal_receita), 2)) if r_prev_base is not None else None
-        orc = float(round(c_prev * (1 + MARGEM_ORCAMENTO), 2)) if c_prev else None
-        roi_p = float(round(((r_prev - c_prev) / c_prev) * 100, 2)) if (c_prev and r_prev and c_prev > 0) else None
-        confianca = max(50, round((r2_custo or 0) * 100 * (1 - i * 0.03)))
+        c_prev     = float(round(max(0, c_prev_base + ajuste_sazonal_custo), 2)) if c_prev_base is not None else None
+        r_prev     = float(round(max(0, r_prev_base + ajuste_sazonal_receita), 2)) if r_prev_base is not None else None
+        orc        = float(round(c_prev * (1 + MARGEM_ORCAMENTO), 2)) if c_prev else None
+        roi_p      = float(round(((r_prev - c_prev) / c_prev) * 100, 2)) if (c_prev and r_prev and c_prev > 0) else None
+        confianca  = max(50, round((r2_custo or 0) * 100 * (1 - i * 0.03)))
         projecoes.append({
-            "mes": str(periodo_previsto),
-            "custo_previsto": c_prev,
+            "mes":              str(periodo_previsto),
+            "custo_previsto":   c_prev,
             "receita_prevista": r_prev,
-            "orcamento": orc,
-            "roi_previsto": roi_p,
-            "ic_95": ic_95,
-            "confianca": confianca,
-            "mes_base_sazonal": mes_ano_passado,
-            "fluxo_sazonal": "alto" if ajuste_sazonal_receita >= 0 else "baixo",
+            "orcamento":        orc,
+            "roi_previsto":     roi_p,
+            "ic_95":            ic_95,
+            "confianca":        confianca,
+            "mes_base_sazonal":  mes_ano_passado,
+            "fluxo_sazonal":    "alto" if ajuste_sazonal_receita >= 0 else "baixo",
             "ajuste_sazonal_custo": float(round(ajuste_sazonal_custo, 2)),
             "ajuste_sazonal_receita": float(round(ajuste_sazonal_receita, 2))
         })
@@ -549,7 +559,7 @@ def dashFinanceiro(event, context):
             {
                 "mes": row["MES"],
                 "custo":  float(round(row["CUSTO_MES"], 2)),
-                "receita": float(round(row["RECEITA_MES"], 2)),
+                "receita": float(round(raw["RECEITA_MES"], 2)),
                 "roi": float(round(((row["RECEITA_MES"] - row["CUSTO_MES"]) / row["CUSTO_MES"]) * 100, 2))
                            if row["CUSTO_MES"] > 0 else 0.0
             }
