@@ -685,6 +685,85 @@ def calcularScoreDatacenter(zonas):
         "zonaPiorScore": round(zonaPiorScore, 2)
     }
 
+#SAUDE REGIÃO
+
+# SCORE SAÚDE REGIÃO
+def calcularScoreRegiao(datacentersRegiao):
+    total = len(datacentersRegiao)
+
+    if total == 0:
+        return {
+            "score": 100,
+            "status": "Saudável",
+            "qntDatacenters": 0,
+            "qntDatacentersCriticos": 0,
+            "qntDatacentersAtencao": 0,
+            "datacenterPiorScore": 100
+        }
+
+    qntCriticos = 0
+    qntAtencao = 0
+    datacenterPiorScore = 100
+
+    for datacenter in datacentersRegiao:
+        score = datacenter["score"]
+        status = datacenter["status"]
+
+        if status == "Crítico":
+            qntCriticos += 1
+        elif status == "Atenção":
+            qntAtencao += 1
+
+        if score < datacenterPiorScore:
+            datacenterPiorScore = score
+
+    percentCriticos = qntCriticos / total
+    percentAtencao = qntAtencao / total
+
+    if percentCriticos > 0.50:
+        penalidadeCritico = 45
+    elif percentCriticos > 0.25:
+        penalidadeCritico = 30
+    elif percentCriticos > 0:
+        penalidadeCritico = 18
+    else:
+        penalidadeCritico = 0
+
+    if percentAtencao > 0.50:
+        penalidadeAtencao = 18
+    elif percentAtencao > 0.25:
+        penalidadeAtencao = 12
+    elif percentAtencao > 0:
+        penalidadeAtencao = 6
+    else:
+        penalidadeAtencao = 0
+
+    if datacenterPiorScore < 40:
+        penalidadePiorDatacenter = 22
+    elif datacenterPiorScore < 60:
+        penalidadePiorDatacenter = 14
+    elif datacenterPiorScore < 80:
+        penalidadePiorDatacenter = 7
+    else:
+        penalidadePiorDatacenter = 0
+
+    score_regiao = (
+        100
+        - penalidadeCritico
+        - penalidadeAtencao
+        - penalidadePiorDatacenter
+    )
+
+    score_regiao = max(0, min(100, score_regiao))
+
+    return {
+        "score": round(score_regiao, 2),
+        "status": classificarStatusScore(score_regiao),
+        "qntDatacenters": total,
+        "qntDatacentersCriticos": qntCriticos,
+        "qntDatacentersAtencao": qntAtencao,
+        "datacenterPiorScore": round(datacenterPiorScore, 2)
+    }
 #------------------------------------------------------------------------------------------------------------------------------------------------
 #Projecao de score e tendencia de componentesque vão aumentar criticamente
 
@@ -1251,7 +1330,7 @@ def dashOperacional(dados, geral, bucket):
         return {
             "tipo": "gestora",
             "total_dados": 0,
-            "datacenters": {}
+            "empresas": {}
         }
 
     df["DATE"] = pd.to_datetime(df["DATE"])
@@ -1265,150 +1344,194 @@ def dashOperacional(dados, geral, bucket):
 
     resultado = {}
 
-    for (empresa, datacenter), df_dc in df.groupby(["EMPRESA", "DATACENTER"]):
+    for empresa, df_empresa in df.groupby("EMPRESA"):
 
-        print(f"\n🏢 DATACENTER: {datacenter}")
+        print(f"\n🏢 EMPRESA: {empresa}")
 
-        graficoAlertasSemana = calcularAlertaSemana(
-            historicoAlertas,
-            empresa,
-            datacenter
-        )
+        resultado.setdefault(empresa, {
+            "regioes": {},
+            "datacenters": {}
+        })
 
-        zonas = []
-        servidores_datacenter = []
-        uptimeServidores = []
+        for regiao, df_regiao in df_empresa.groupby("REGIAO"):
 
-        for zona, df_zona in df_dc.groupby("ZONA"):
+            print(f"\n🌎 REGIÃO: {regiao}")
 
-            print(f"\n📍 ZONA: {zona}")
+            datacentersRegiao = []
 
-            servidoresZona = []
+            for datacenter, df_dc in df_regiao.groupby("DATACENTER"):
 
-            for servidor, df_servidor in df_zona.groupby("SERVIDOR"):
+                print(f"\n🏢 DATACENTER: {datacenter}")
 
-                print(f"\n🖥️ SERVIDOR: {servidor}")
-
-                try:
-                    info_servidor = geral[empresa][datacenter][zona][servidor]
-                    limites = info_servidor.get("limites", {})
-
-                    print("✅ Limites encontrados:", limites)
-
-                except (KeyError, TypeError):
-                    limites = {}
-                    print("⚠️ Limites não encontrados. Usando fallback.")
-
-                chamadosServidor = obterChamadosServidor(
-                    chamadosJson,
+                graficoAlertasSemana = calcularAlertaSemana(
+                    historicoAlertas,
                     empresa,
-                    datacenter,
-                    zona,
-                    servidor
+                    datacenter
                 )
 
-                resultadoUptime = calcularUptimeServidor(
-                    chamadosServidor,
-                    servidor,
-                    zona,
-                    inicioPeriodoUptime,
-                    fimPeriodoUptime
+                zonas = []
+                servidores_datacenter = []
+                uptimeServidores = []
+
+                for zona, df_zona in df_dc.groupby("ZONA"):
+
+                    print(f"\n📍 ZONA: {zona}")
+
+                    servidoresZona = []
+
+                    for servidor, df_servidor in df_zona.groupby("SERVIDOR"):
+
+                        print(f"\n🖥️ SERVIDOR: {servidor}")
+
+                        try:
+                            info_servidor = geral[empresa][datacenter][zona][servidor]
+                            limites = info_servidor.get("limites", {})
+
+                            print("✅ Limites encontrados:", limites)
+
+                        except (KeyError, TypeError):
+                            limites = {}
+                            print("⚠️ Limites não encontrados. Usando fallback.")
+
+                        chamadosServidor = obterChamadosServidor(
+                            chamadosJson,
+                            empresa,
+                            datacenter,
+                            zona,
+                            servidor
+                        )
+
+                        resultadoUptime = calcularUptimeServidor(
+                            chamadosServidor,
+                            servidor,
+                            zona,
+                            inicioPeriodoUptime,
+                            fimPeriodoUptime
+                        )
+
+                        uptimeServidores.append(resultadoUptime)
+
+                        df_servidor = df_servidor.sort_values("DATE")
+                        coletaServidor = df_servidor.to_dict(orient="records")
+
+                        print(f"📦 Quantidade de coletas: {len(coletaServidor)}")
+
+                        resultadoScore = calcularScoreServidor(
+                            coletaServidor,
+                            limites
+                        )
+
+                        print("📊 SCORE SERVIDOR:", resultadoScore)
+
+                        servidor_obj = {
+                            "servidor": servidor,
+                            "zona": zona,
+                            "score": resultadoScore["score"],
+                            "status": resultadoScore["status"],
+                            "scoreParcialAtual": resultadoScore["scoreParcialAtual"],
+                            "scoreParcialAnterior": resultadoScore["scoreParcialAnterior"],
+                            "queda": resultadoScore["queda"],
+                            "penalidadeTendencia": resultadoScore["penalidadeTendencia"],
+                            "projecaoSaude": resultadoScore["projecaoSaude"],
+                            "uptimeOperacional": resultadoUptime
+                        }
+
+                        servidoresZona.append(servidor_obj)
+                        servidores_datacenter.append(servidor_obj)
+
+                    resultadoZona = calcularScoreZona(servidoresZona)
+
+                    print("📊 SCORE ZONA:", resultadoZona)
+
+                    zona_obj = {
+                        "zona": zona,
+                        "score": resultadoZona["score"],
+                        "status": resultadoZona["status"],
+                        "qntServidores": resultadoZona["qntServidores"],
+                        "qntCriticos": resultadoZona["qntCriticos"],
+                        "qntAtencao": resultadoZona["qntAtencao"],
+                        "srvPiorScore": resultadoZona["srvPiorScore"],
+                        "servidores": servidoresZona
+                    }
+
+                    zonas.append(zona_obj)
+
+                    print(f"✅ JSON da zona {zona} criado")
+
+                resultadoDatacenter = calcularScoreDatacenter(zonas)
+
+                print("📊 SCORE DATACENTER:", resultadoDatacenter)
+
+                rankingSrvCriticosTop5 = sorted(
+                    servidores_datacenter,
+                    key=lambda servidor: servidor["score"]
+                )[:5]
+
+                kpiCrescimentoIncidentes = calcularCrescimentoIncidentes(
+                    historicoAlertas,
+                    empresa,
+                    datacenter
                 )
 
-                uptimeServidores.append(resultadoUptime)
-
-                df_servidor = df_servidor.sort_values("DATE")
-                coletaServidor = df_servidor.to_dict(orient="records")
-
-                print(f"📦 Quantidade de coletas: {len(coletaServidor)}")
-
-                resultadoScore = calcularScoreServidor(
-                    coletaServidor,
-                    limites
+                kpiServidoresCriticos = calcularKpiServidoresCriticos(
+                    servidores_datacenter
                 )
 
-                print("📊 SCORE SERVIDOR:", resultadoScore)
+                kpiUptime = calcularKpiUptime(uptimeServidores)
 
-                servidor_obj = {
-                    "servidor": servidor,
-                    "zona": zona,
-                    "score": resultadoScore["score"],
-                    "status": resultadoScore["status"],
-                    "scoreParcialAtual": resultadoScore["scoreParcialAtual"],
-                    "scoreParcialAnterior": resultadoScore["scoreParcialAnterior"],
-                    "queda": resultadoScore["queda"],
-                    "penalidadeTendencia": resultadoScore["penalidadeTendencia"],
-                    "projecaoSaude": resultadoScore["projecaoSaude"],
-                    "uptimeOperacional": resultadoUptime
+                datacenter_obj_completo = {
+                    "regiao": regiao,
+                    "score": resultadoDatacenter["score"],
+                    "status": resultadoDatacenter["status"],
+                    "qntZonas": resultadoDatacenter["qntZonas"],
+                    "qntZonasCriticas": resultadoDatacenter["qntZonasCriticas"],
+                    "qntZonasAtencao": resultadoDatacenter["qntZonasAtencao"],
+                    "zonaPiorScore": resultadoDatacenter["zonaPiorScore"],
+                    "zonas": zonas,
+                    "rankingSrvCriticosTop5": rankingSrvCriticosTop5,
+                    "graficoAlertasSemana": graficoAlertasSemana,
+                    "uptimeServidores": uptimeServidores,
+                    "kpiUptime": kpiUptime,
+                    "kpiCrescimentoIncidentes": kpiCrescimentoIncidentes,
+                    "kpiServidoresCriticos": kpiServidoresCriticos
                 }
 
-                servidoresZona.append(servidor_obj)
-                servidores_datacenter.append(servidor_obj)
+                resultado[empresa]["datacenters"][datacenter] = datacenter_obj_completo
 
-            resultadoZona = calcularScoreZona(servidoresZona)
+                datacenter_obj_regiao = {
+                    "datacenter": datacenter,
+                    "score": resultadoDatacenter["score"],
+                    "status": resultadoDatacenter["status"],
+                    "qntZonas": resultadoDatacenter["qntZonas"],
+                    "qntZonasCriticas": resultadoDatacenter["qntZonasCriticas"],
+                    "qntZonasAtencao": resultadoDatacenter["qntZonasAtencao"],
+                    "zonaPiorScore": resultadoDatacenter["zonaPiorScore"]
+                }
 
-            print("📊 SCORE ZONA:", resultadoZona)
+                datacentersRegiao.append(datacenter_obj_regiao)
 
-            zona_obj = {
-                "zona": zona,
-                "score": resultadoZona["score"],
-                "status": resultadoZona["status"],
-                "qntServidores": resultadoZona["qntServidores"],
-                "qntCriticos": resultadoZona["qntCriticos"],
-                "qntAtencao": resultadoZona["qntAtencao"],
-                "srvPiorScore": resultadoZona["srvPiorScore"],
-                "servidores": servidoresZona
+                print(f"✅ JSON FINAL DO DATACENTER {datacenter} CRIADO")
+
+            resultadoRegiao = calcularScoreRegiao(datacentersRegiao)
+
+            print("📊 SCORE REGIÃO:", resultadoRegiao)
+
+            resultado[empresa]["regioes"][regiao] = {
+                "score": resultadoRegiao["score"],
+                "status": resultadoRegiao["status"],
+                "qntDatacenters": resultadoRegiao["qntDatacenters"],
+                "qntDatacentersCriticos": resultadoRegiao["qntDatacentersCriticos"],
+                "qntDatacentersAtencao": resultadoRegiao["qntDatacentersAtencao"],
+                "datacenterPiorScore": resultadoRegiao["datacenterPiorScore"],
+                "datacenters": datacentersRegiao
             }
 
-            zonas.append(zona_obj)
-
-            print(f"✅ JSON da zona {zona} criado")
-
-        resultadoDatacenter = calcularScoreDatacenter(zonas)
-
-        print("📊 SCORE DATACENTER:", resultadoDatacenter)
-
-        rankingSrvCriticosTop5 = sorted(
-            servidores_datacenter,
-            key=lambda servidor: servidor["score"]
-        )[:5]
-
-        kpiCrescimentoIncidentes = calcularCrescimentoIncidentes(
-            historicoAlertas,
-            empresa,
-            datacenter
-        )
-
-        kpiServidoresCriticos = calcularKpiServidoresCriticos(
-            servidores_datacenter
-        )
-
-        kpiUptime = calcularKpiUptime(uptimeServidores)
-
-        resultado.setdefault(empresa, {})
-
-        resultado[empresa][datacenter] = {
-            "score": resultadoDatacenter["score"],
-            "status": resultadoDatacenter["status"],
-            "qntZonas": resultadoDatacenter["qntZonas"],
-            "qntZonasCriticas": resultadoDatacenter["qntZonasCriticas"],
-            "qntZonasAtencao": resultadoDatacenter["qntZonasAtencao"],
-            "zonaPiorScore": resultadoDatacenter["zonaPiorScore"],
-            "zonas": zonas,
-            "rankingSrvCriticosTop5": rankingSrvCriticosTop5,
-            "graficoAlertasSemana": graficoAlertasSemana,
-            "uptimeServidores": uptimeServidores,
-            "kpiUptime": kpiUptime,
-            "kpiCrescimentoIncidentes": kpiCrescimentoIncidentes,
-            "kpiServidoresCriticos": kpiServidoresCriticos
-        }
-
-        print(f"✅ JSON FINAL DO DATACENTER {datacenter} CRIADO")
+            print(f"✅ JSON FINAL DA REGIÃO {regiao} CRIADO")
 
     print("\n🎉 DASH OPERACIONAL FINALIZADA")
 
     return {
         "tipo": "gestora",
         "total_dados": len(dados),
-        "datacenters": resultado
+        "empresas": resultado
     }
