@@ -184,7 +184,7 @@ def validarServidor():
     return servidor
 
 
-def capturaCSV(servidor):
+def capturaCSV(servidor, enviar_s3=False):
     print("INICIANDO A CAPTAÇÃO DOS DADOS")
     arquivo_csv = f"dados-brutos-{servidor[0][1]}.csv"
     
@@ -480,8 +480,9 @@ def capturaCSV(servidor):
         csvfile.flush()
 
         nome_arquivo_s3 = f"raw/{dados_dict['EMPRESA']}_{dados_dict['DATACENTER']}_{dados_dict['ZONA']}_{dados_dict['SERVIDOR']}_dadosBrutos.csv"
-        print("Enviando dados capturados")
-        upload_file(arquivo_csv, bucket_name, nome_arquivo_s3)
+        if enviar_s3:
+            print("Enviando dados capturados")
+            upload_file(arquivo_csv, bucket_name, nome_arquivo_s3)
 
 
 def capturaJson():
@@ -563,7 +564,7 @@ def capturaJson():
     for linha in geral:
         empresa = linha["empresa"]
         datacenter = linha["datacenter"]
-        zona = linha["zona"]
+        zona = linha["zona"].replace(" ", "")        
         servidor = linha["servidor"]
         componente = linha["componente"]
 
@@ -674,7 +675,7 @@ def capturaJson():
 
             for zona in zonas:
                         id_zona = zona[0]
-                        nome_zona = zona[1]
+                        nome_zona = zona[1].replace(" ", "")
 
                   
 
@@ -806,30 +807,29 @@ JOIN registros_alertas ON fkRegistroServidor = idServidor WHERE z.idZona = {id_z
 
 servidor = validarServidor()
 
-
-
-
-
-
-    
-
 if servidor:
-    cont = -1
+    cont_json = -1
+    cont_linhas_csv = 0
+
     while True:
-        capturaCSV(servidor)
+        cont_linhas_csv += 1
+
+        deve_enviar_csv = cont_linhas_csv >= 30
+
+        capturaCSV(servidor, deve_enviar_csv)
+
+        if deve_enviar_csv:
+            cont_linhas_csv = 0
+
         time.sleep(10)
 
-        if (cont == 30 or cont == -1):
-            cont = 0
+        if cont_json == 30 or cont_json == -1:
+            cont_json = 0
             capturaJson()
-        cont += 1
+
+        cont_json += 1
 else:
     print("Erro na validação")
-
-
-
-
-
 
 
     
