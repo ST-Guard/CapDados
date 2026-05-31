@@ -507,7 +507,7 @@ def capturaJson():
             r.estado,
             r.cep,
             r.numero,
-            r.complemento,
+            r.uf,
             d.idDataCenter,
             d.nome AS datacenter,
             d.capacidadeServidores,
