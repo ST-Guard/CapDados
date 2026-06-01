@@ -19,7 +19,7 @@ arquivo_csv = "dados-brutos_maquina.csv"
 bucket_name = 'smartdatabucket2'
 
 #STE12345
-#SRV-DC01-WEB-05
+#SERVIDOR-SP-01
 
 print("""\033[33m
   /$$$$$$                                      /$$     /$$$$$$$              /$$              
@@ -502,7 +502,7 @@ def capturaJson():
             r.estado,
             r.cep,
             r.numero,
-            r.complemento,
+            r.estado,
             d.idDataCenter,
             d.nome AS datacenter,
             d.capacidadeServidores,
@@ -563,7 +563,7 @@ def capturaJson():
     for linha in geral:
         empresa = linha["empresa"]
         datacenter = linha["datacenter"]
-        zona = linha["zona"]
+        zona = linha["zona"].replace(" ", "")
         servidor = linha["servidor"]
         componente = linha["componente"]
 

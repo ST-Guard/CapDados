@@ -11,11 +11,21 @@ s3 = boto3.client('s3')
 def lambda_handler(event, context):
     print("Lambda dashboard financiera Iniciada! 💵")
     try:
-        registro = event["Records"][0]["s3"]
+        mensagem_sns_texto = event["Records"][0]["Sns"]["Message"]
+        evento_s3_real = json.loads(mensagem_sns_texto)
+        
+        if "Evento" in evento_s3_real and evento_s3_real["Evento"] == "s3:TestEvent":
+            print("Evento de teste do S3 recebido e ignorado com sucesso! ✅")
+            return {"statusCode": 200, "body": "TestEvent ignorado"}
+            
+   
+        registro = evento_s3_real["Records"][0]["s3"]
         key = unquote_plus(registro["object"]["key"])
         bucket = registro["bucket"]["name"]
+        
         if key.lower().endswith(".json"):
             return {"statusCode": 200, "body": f"Arquivo JSON ignorado: {key}"}
+            
         if key != "trusted/dados_tratados.csv":
             print(f"Ignorando arquivo que não é o trusted principal: {key}")
             return {"statusCode": 200, "body": f"Arquivo ignorado: {key}"}
@@ -109,9 +119,13 @@ def calcularMAE(x, y, modelo):
 
 def dashFinanceiro(event, context):
     # Extrair informações do S3
-    registro = event["Records"][0]["s3"]
-    bucket = registro["bucket"]["name"]
+    mensagem_sns_texto = event["Records"][0]["Sns"]["Message"]
+    evento_s3_real = json.loads(mensagem_sns_texto)
+    registro = evento_s3_real["Records"][0]["s3"]
+
+
     key = unquote_plus(registro["object"]["key"])
+    bucket = registro["bucket"]["name"]
     
     print(f"Baixando dados tratados de: {key}")
     
@@ -315,11 +329,16 @@ def dashFinanceiro(event, context):
         .sort_values('MES')  
     )
 
-   
-    # Normalizador: Projeta meses quebrados (como o primeiro de 6 dias) para 30 dias - PRO-RATA
+    # Normalizador: Projeta meses quebrados para 30 dias - PRO-RATA
     INTERVALOS_PADRAO = 30 * 24 * 12 # 8640 intervalos de 5 min
-    historico_mensal['CUSTO_MES'] = historico_mensal['CUSTO_MES'] * (INTERVALOS_PADRAO / historico_mensal['QTD_INTERVALOS'])
-    historico_mensal['RECEITA_MES'] = historico_mensal['RECEITA_MES'] * (INTERVALOS_PADRAO / historico_mensal['QTD_INTERVALOS'])
+    
+    # Criar uma máscara para ignorar o mês que ainda está rodando (mes_corrente)
+    meses_fechados = historico_mensal['MES'] != mes_corrente
+    fator_escala = INTERVALOS_PADRAO / historico_mensal['QTD_INTERVALOS']
+    
+    # Aplica a multiplicação APENAS nos meses já fechados, deixando o mês atual intacto
+    historico_mensal.loc[meses_fechados, 'CUSTO_MES'] *= fator_escala[meses_fechados]
+    historico_mensal.loc[meses_fechados, 'RECEITA_MES'] *= fator_escala[meses_fechados]
 
     treino = historico_mensal[historico_mensal['MES'] < mes_corrente]
 
@@ -559,7 +578,7 @@ def dashFinanceiro(event, context):
             {
                 "mes": row["MES"],
                 "custo":  float(round(row["CUSTO_MES"], 2)),
-                "receita": float(round(raw["RECEITA_MES"], 2)),
+                "receita": float(round(row["RECEITA_MES"], 2)),
                 "roi": float(round(((row["RECEITA_MES"] - row["CUSTO_MES"]) / row["CUSTO_MES"]) * 100, 2))
                            if row["CUSTO_MES"] > 0 else 0.0
             }
