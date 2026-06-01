@@ -33,7 +33,7 @@ def lambda_handler(event, context):
                 "body": resultado_trusted
             }
     except Exception as e:
-        print(f"❌ Erro fatal: {e}")
+        print(f"Erro fatal: {e}")
         return {
             "statusCode": 500,
             "body": str(e)
@@ -148,7 +148,6 @@ def TrustedJson(event, context):
         "chave": chave_destino_mestre
     }
 
-
 #Função de envio dos JSON para o Client
 def ClientGeral(bucket, chave):
     print(f"Lendo arquivo Trusted no S3: {chave}")
@@ -158,7 +157,6 @@ def ClientGeral(bucket, chave):
     dados_dicionario = json.loads(conteudo_texto)
 
     # Le os arquivos do JSON feito pelo SAMU
-
     geral = {}
     try:
         resp_geral = s3.get_object(Bucket=bucket, Key="raw/geral.json")
@@ -167,36 +165,10 @@ def ClientGeral(bucket, chave):
     except Exception as e:
         print(f"geral.json não encontrado — . Erro: {e}")
  
-
-    
-    respFinanceiro = dashFinanceiro(dados_dicionario)
-    respGestora = dashGestora(dados_dicionario)
-    respAnalista = dashAnalista(dados_dicionario)
     # DASHBOARD ALERTAS  - Victor G
     respAlertasGestora = dashAlertasGestora(dados_dicionario, geral, bucket)
- 
-
-
-    s3.put_object(
-        Bucket=bucket, 
-        Key="client/financeiro_master.json", 
-        Body=json.dumps(respFinanceiro, default=str, indent=4)
-    )
-
-    s3.put_object(
-        Bucket=bucket, 
-        Key="client/gestora_master.json", 
-        Body=json.dumps(respGestora, default=str, indent=4)
-    )
-
-    s3.put_object(
-        Bucket=bucket, 
-        Key="client/analista_master.json", 
-        Body=json.dumps(respAnalista, default=str, indent=4)
-    )
 
     # DASH DE ALERTAS - Victor G
-
     s3.put_object(
         Bucket=bucket,
         Key="client/alertas_gestora.json",
@@ -205,20 +177,7 @@ def ClientGeral(bucket, chave):
 
     return "Todas as paginas processadas e atualizadas."
 
-# ZONA DE TRABALHO
-
-def dashFinanceiro(dados):
-    return {"tipo": "financeiro", "total_dados": len(dados)} 
-
-def dashGestora(dados):
-    return {"tipo": "gestora", "total_dados": len(dados)}
-
-def dashAnalista(dados):
-    return {"tipo": "analista", "total_dados": len(dados)}
-
-
 # JSON dashboard Alertas - Victor G
-
 def dashAlertasGestora(dados, geral, bucket):
  
     COMPONENTES = {
@@ -238,7 +197,7 @@ def dashAlertasGestora(dados, geral, bucket):
             return "medio"
         elif excedido > 0:
             return "baixo"
-        return None  # dentro do limite
+        return None 
 
     SLA_HORAS = {"critico": 1, "medio": 4, "baixo": 24}
  
@@ -291,11 +250,11 @@ def dashAlertasGestora(dados, geral, bucket):
             id_analista   = info_servidor.get("id_analista", None)
             nome_analista = info_servidor.get("funcionarios", ["Desconhecido"])[0]
         except (KeyError, TypeError):
-            print(f"[AVISO] Servidor {servidor} não encontrado no geral.json — pulando.")
+            print(f"Servidor {servidor} não encontrado no geral.json — pulando.")
             continue
  
         if not limites:
-            print(f"[AVISO] Sem limites definidos para {servidor} — pulando.")
+            print(f"Sem limites definidos para {servidor} — pulando.")
             continue
  
         if empresa not in resultado:
@@ -308,7 +267,6 @@ def dashAlertasGestora(dados, geral, bucket):
                     "CRITICOS_ABERTOS":         0,
                     "MEDIOS_ABERTOS":            0,
                     "BAIXOS_ABERTOS":            0,
-                    # Preenchido pelo Java após consultar chamados resolvidos no Jira
                     "RESOLVIDOS_24H":            0,
                     "SERVIDOR_MAIS_ALERTAS":     None,
                     "QTD_ALERTAS_SERVIDOR_TOP":  0
@@ -347,7 +305,7 @@ def dashAlertasGestora(dados, geral, bucket):
  
             severidade = calcular_severidade(valor, limite)
             if severidade is None:
-                continue  # componente dentro do limite — sem alerta
+                continue 
  
             alertas_servidor_ciclo += 1
             timestamp_str = str(data_leitura)
