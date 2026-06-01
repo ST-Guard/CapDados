@@ -1,33 +1,153 @@
 {
     "Steam": {
-        "DC01-SP": {
-            "Zona Alpha": {
+        "DC-SP-01": {
+            "Zona A": {
                 "QUANTIDADE_ABERTO": 0,
-                "MTTR_ZONA": 0,
-                "SRV-DC01-WEB-05": {
+                "MTTR_ZONA": "197.1429",
+                "SERVIDOR-SP-01": {
                     "idServidor": 1,
                     "chamados": {}
                 },
-                "SRV-DC01-DB-12": {
+                "SERVIDOR-SP-02": {
                     "idServidor": 2,
                     "chamados": {}
                 },
-                "SRV-FK02-GM-02": {
+                "SERVIDOR-SP-03": {
                     "idServidor": 3,
-                    "chamados": {}
-                },
-                "SRV-DC01-WEB-08": {
-                    "idServidor": 4,
                     "chamados": {}
                 }
             },
-            "Zona Beta": {
+            "Zona B": {
                 "QUANTIDADE_ABERTO": 0,
-                "MTTR_ZONA": 0
+                "MTTR_ZONA": "325.0000",
+                "SERVIDOR-SP-04": {
+                    "idServidor": 4,
+                    "chamados": {}
+                },
+                "SERVIDOR-SP-05": {
+                    "idServidor": 5,
+                    "chamados": {}
+                },
+                "SERVIDOR-SP-06": {
+                    "idServidor": 6,
+                    "chamados": {}
+                }
             },
-            "Zona Omega": {
+            "Zona C": {
                 "QUANTIDADE_ABERTO": 0,
-                "MTTR_ZONA": 0
+                "MTTR_ZONA": "1320.0000",
+                "SERVIDOR-SP-07": {
+                    "idServidor": 7,
+                    "chamados": {}
+                },
+                "SERVIDOR-SP-08": {
+                    "idServidor": 8,
+                    "chamados": {}
+                },
+                "SERVIDOR-SP-09": {
+                    "idServidor": 9,
+                    "chamados": {}
+                }
+            }
+        },
+        "DC-RJ-01": {
+            "Zona A": {
+                "QUANTIDADE_ABERTO": 0,
+                "MTTR_ZONA": "258.8889",
+                "SERVIDOR-RJ-01": {
+                    "idServidor": 10,
+                    "chamados": {}
+                },
+                "SERVIDOR-RJ-02": {
+                    "idServidor": 11,
+                    "chamados": {}
+                },
+                "SERVIDOR-RJ-03": {
+                    "idServidor": 12,
+                    "chamados": {}
+                }
+            },
+            "Zona B": {
+                "QUANTIDADE_ABERTO": 0,
+                "MTTR_ZONA": "745.0000",
+                "SERVIDOR-RJ-04": {
+                    "idServidor": 13,
+                    "chamados": {}
+                },
+                "SERVIDOR-RJ-05": {
+                    "idServidor": 14,
+                    "chamados": {}
+                },
+                "SERVIDOR-RJ-06": {
+                    "idServidor": 15,
+                    "chamados": {}
+                }
+            },
+            "Zona C": {
+                "QUANTIDADE_ABERTO": 0,
+                "MTTR_ZONA": 0,
+                "SERVIDOR-RJ-07": {
+                    "idServidor": 16,
+                    "chamados": {}
+                },
+                "SERVIDOR-RJ-08": {
+                    "idServidor": 17,
+                    "chamados": {}
+                },
+                "SERVIDOR-RJ-09": {
+                    "idServidor": 18,
+                    "chamados": {}
+                }
+            }
+        },
+        "DC-RS-01": {
+            "Zona A": {
+                "QUANTIDADE_ABERTO": 0,
+                "MTTR_ZONA": "267.2222",
+                "SERVIDOR-RS-01": {
+                    "idServidor": 19,
+                    "chamados": {}
+                },
+                "SERVIDOR-RS-02": {
+                    "idServidor": 20,
+                    "chamados": {}
+                },
+                "SERVIDOR-RS-03": {
+                    "idServidor": 21,
+                    "chamados": {}
+                }
+            },
+            "Zona B": {
+                "QUANTIDADE_ABERTO": 0,
+                "MTTR_ZONA": "740.0000",
+                "SERVIDOR-RS-04": {
+                    "idServidor": 22,
+                    "chamados": {}
+                },
+                "SERVIDOR-RS-05": {
+                    "idServidor": 23,
+                    "chamados": {}
+                },
+                "SERVIDOR-RS-06": {
+                    "idServidor": 24,
+                    "chamados": {}
+                }
+            },
+            "Zona C": {
+                "QUANTIDADE_ABERTO": 0,
+                "MTTR_ZONA": 0,
+                "SERVIDOR-RS-07": {
+                    "idServidor": 25,
+                    "chamados": {}
+                },
+                "SERVIDOR-RS-08": {
+                    "idServidor": 26,
+                    "chamados": {}
+                },
+                "SERVIDOR-RS-09": {
+                    "idServidor": 27,
+                    "chamados": {}
+                }
             }
         }
     }
