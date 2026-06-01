@@ -135,11 +135,12 @@ def dashAlertasGestora(dados, geral, bucket):
     for linha in dados:
         # Mantemos as chaves originais para exibir bonito depois
         empresa_orig = str(linha.get("EMPRESA",    "")).strip()
+        regiao_orig      = str(linha.get("REGIAO", "")).strip()
         dc_orig      = str(linha.get("DATACENTER", "")).strip()
         zona_orig    = str(linha.get("ZONA",       "")).strip()
         servidor_orig = str(linha.get("SERVIDOR",   "")).strip()
 
-        chave = (empresa_orig, dc_orig, zona_orig, servidor_orig)
+        chave = (empresa_orig, regiao_orig, dc_orig, zona_orig, servidor_orig)
         
         data_str = str(linha.get("DATE", ""))
         try:
@@ -170,15 +171,15 @@ def dashAlertasGestora(dados, geral, bucket):
  
     alertas_novos = []  
  
-    for (empresa, datacenter, zona, servidor), (data_leitura, linha) in ultimas_leituras.items():
+    for (empresa, regiao_orig, datacenter, zona, servidor), (data_leitura, linha) in ultimas_leituras.items():
  
         # TRAVA DE SEGURANÇA CONTRA CSV EM BRANCO
         if not empresa or not datacenter or not zona or not servidor:
-            print(f"[AVISO] CSV incompleto! Empresa:'{empresa}', DC:'{datacenter}', Zona:'{zona}', Servidor:'{servidor}' — pulando.")
+            print(f"CSV incompleto! Empresa:'{empresa}', Região: '{regiao_orig}', DC:'{datacenter}', Zona:'{zona}', Servidor:'{servidor}' — pulando.")
             continue
  
         try:
-            caminho_busca = [empresa, datacenter, zona, servidor]
+            caminho_busca = [empresa, regiao_orig, datacenter, zona, servidor]
             info_servidor = buscar_no_json_case_insensitive(geral, caminho_busca)
             
             limites       = info_servidor.get("limites", {})
@@ -191,11 +192,11 @@ def dashAlertasGestora(dados, geral, bucket):
                 id_analista   = None
                 nome_analista = "Desconhecido"
         except (KeyError, TypeError):
-            print(f"[AVISO] Servidor {servidor} não encontrado no metricas.json — pulando.")
+            print(f"Servidor {servidor} não encontrado no metricas.json — pulando.")
             continue
  
         if not limites:
-            print(f"[AVISO] Sem limites definidos para {servidor} — pulando.")
+            print(f"Sem limites definidos para {servidor} — pulando.")
             continue
  
         if empresa not in resultado:
