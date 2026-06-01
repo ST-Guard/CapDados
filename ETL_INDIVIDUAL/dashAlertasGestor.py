@@ -39,7 +39,6 @@ def lambda_handler(event, context):
             "body": str(e)
         }
 
-
 # Função que faz o tratamento dos dados
 def TrustedJson(event, context):
     #Pega o arquivo que chegou no Lambda
@@ -171,7 +170,7 @@ def ClientGeral(bucket, chave):
     # DASH DE ALERTAS - Victor G
     s3.put_object(
         Bucket=bucket,
-        Key="client/alertas_gestora.json",
+        Key="dados_alertas/alertas_gestora.json",
         Body=json.dumps(respAlertasGestora, default=str, indent=4)
     )
 
@@ -203,7 +202,6 @@ def dashAlertasGestora(dados, geral, bucket):
  
     resultado = {}
  
-
     ultimas_leituras = {}  
  
     for linha in dados:
