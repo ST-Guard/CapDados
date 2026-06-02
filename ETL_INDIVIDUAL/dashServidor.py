@@ -95,6 +95,13 @@ def dashServidor(dados, geral, bucket):
 
     servidores = {}
 
+    todos = {
+        "CPU": [],
+        "RAM": [],
+        "DISCO": [],
+        "REDE": []
+    }
+
     COMPONENTES = {
         "CPU": "CPU_PER",
         "RAM": "RAM_PER",
@@ -103,6 +110,12 @@ def dashServidor(dados, geral, bucket):
     }
 
     for linha in dados:
+
+        todos["CPU"].append(float(linha[COMPONENTES["CPU"]]))
+        todos["RAM"].append(float(linha[COMPONENTES["RAM"]]))
+        todos["DISCO"].append(float(linha[COMPONENTES["DISCO"]]))
+        todos["REDE"].append(float(linha[COMPONENTES["REDE"]]))
+
         nome_servidor = linha["SERVIDOR"]
 
         if nome_servidor not in servidores:
@@ -118,6 +131,15 @@ def dashServidor(dados, geral, bucket):
         servidores[nome_servidor]["DISCO"].append(float(linha[COMPONENTES["DISCO"]]))
         servidores[nome_servidor]["REDE"].append(float(linha[COMPONENTES["REDE"]]))
 
+    def calcular_p99(valores):
+        valores_ordenados = sorted(valores)
+        indice = int(len(valores_ordenados) * 0.99)
+
+        if indice >= len(valores_ordenados):
+            indice = len(valores_ordenados) - 1
+
+        return valores_ordenados[indice]
+    
     resultado_servidores = {}
 
     for servidor, componentes in servidores.items():
@@ -140,5 +162,11 @@ def dashServidor(dados, geral, bucket):
             }
 
     return {
+        "KPIS": {
+            "P99CPUTotal": calcular_p99(todos["CPU"]),
+            "P99RAMTotal": calcular_p99(todos["RAM"]),
+            "P99DISCOTotal": calcular_p99(todos["DISCO"]),
+            "P99REDETotal": calcular_p99(todos["REDE"])
+        },
         "Servidores": resultado_servidores
     }
