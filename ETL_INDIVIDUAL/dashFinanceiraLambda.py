@@ -242,18 +242,18 @@ def dashFinanceiro(event, context):
 
         #CUSTO VARIAVEL 
     #ENERGIA
-    POTENCIA_MIN_W = 6000
-    POTENCIA_MAX_W = 18000
-    TARIFA_KWH = 2.20
+    POTENCIA_MIN_W = 1800
+    POTENCIA_MAX_W = 9000
+    TARIFA_KWH = 1.20
     MARGEM_ORCAMENTO = 0.05 
-    CUSTO_OPERACIONAL_POR_JOGADOR_5MIN = 0.006
+    CUSTO_OPERACIONAL_POR_JOGADOR_5MIN = 0.024
 
     fator_carga = (cpu * PESO_CPU_ENERGIA) + (ram * PESO_RAM_ENERGIA) + (disco * PESO_DISCO_ENERGIA)
     potencia_w = POTENCIA_MIN_W + (POTENCIA_MAX_W - POTENCIA_MIN_W) * fator_carga
     energia_kwh = (potencia_w / 1000) * 5 / 60
     
     #REDE
-    CUSTO_BANDA_POR_PACOTE = 0.0035
+    CUSTO_BANDA_POR_PACOTE = 0.0065
     custo_rede = (df['PACOTES_ENV_DELTA'] + df['PACOTES_RCB_DELTA']) * CUSTO_BANDA_POR_PACOTE
     custo_jogadores = df['JOGADORES_ATIVOS_AJUSTADO'] * CUSTO_OPERACIONAL_POR_JOGADOR_5MIN
     
@@ -279,8 +279,8 @@ def dashFinanceiro(event, context):
     # ── FINALIZNADO CUSTO ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
         #CUSTO FIXO
-    CUSTO_GLOBAL_5MIN = (20000.00 + 25000.00) / INTERVALOS_MES  # Licença e DevOps 
-    CUSTO_HW_5MIN = 45000.00 / INTERVALOS_MES              # Hardware (Pago por Servidor ligado)
+    CUSTO_GLOBAL_5MIN = (15000.00 + 15000.00) / INTERVALOS_MES # Licença e DevOps 
+    CUSTO_HW_5MIN = 12000.00 / INTERVALOS_MES             # Hardware (Pago por Servidor ligado)
     
     df_financeiro['CUSTO_5MIN'] = ( CUSTO_GLOBAL_5MIN + (df_financeiro['QTD_SERVIDORES'] * CUSTO_HW_5MIN) + df_financeiro['CUSTO_VAR_5MIN']
     ).round(2)
@@ -295,7 +295,22 @@ def dashFinanceiro(event, context):
     df_financeiro = df_financeiro.sort_values('DATE_5MIN').reset_index(drop=True)
 
     # ── KPIs mês corrente ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    mes_corrente = df_financeiro['MES'].max()
+    intervalos_por_mes = df_financeiro.groupby('MES').size().sort_index()
+    mes_mais_recente = intervalos_por_mes.index[-1]
+    mes_corrente = mes_mais_recente
+
+    if len(intervalos_por_mes) > 1:
+        mes_anterior_disponivel = intervalos_por_mes.index[-2]
+        poucos_dados_mes_recente = (
+            intervalos_por_mes.loc[mes_mais_recente] < 288 or
+            intervalos_por_mes.loc[mes_mais_recente] < (intervalos_por_mes.loc[mes_anterior_disponivel] * 0.25)
+        )
+
+        if poucos_dados_mes_recente:
+            mes_corrente = mes_anterior_disponivel
+
+    print("Mes mais recente no CSV:", mes_mais_recente)
+    print("Mes usado para KPIs e graficos mensais:", mes_corrente)
     df_mes_corr = df_financeiro[df_financeiro['MES'] == mes_corrente]
     receita_corrente = float(round(df_mes_corr['RECEITA_5MIN'].sum(), 2))
     custo_corrente   = float(round(df_mes_corr['CUSTO_5MIN'].sum(),   2))
@@ -328,12 +343,13 @@ def dashFinanceiro(event, context):
         .reset_index()
         .sort_values('MES')  
     )
+    historico_mensal = historico_mensal[historico_mensal['MES'] <= mes_corrente].copy()
 
     # Normalizador: Projeta meses quebrados para 30 dias - PRO-RATA
     INTERVALOS_PADRAO = 30 * 24 * 12 # 8640 intervalos de 5 min
     
     # Criar uma máscara para ignorar o mês que ainda está rodando (mes_corrente)
-    meses_fechados = historico_mensal['MES'] != mes_corrente
+    meses_fechados = historico_mensal['MES'] != mes_mais_recente
     fator_escala = INTERVALOS_PADRAO / historico_mensal['QTD_INTERVALOS']
     
     # Aplica a multiplicação APENAS nos meses já fechados, deixando o mês atual intacto
@@ -424,7 +440,7 @@ def dashFinanceiro(event, context):
         "fixo_global": global_mes
     }
     
-   # GRÁFICO BARRAS Custo por datacenter e zona (mês corrente)
+   # GRÁFICO BARRAS Custo por datacenter (mês corrente)
     df_mes_completo = df[df['MES'] == mes_corrente].copy()
     
     
@@ -441,7 +457,7 @@ def dashFinanceiro(event, context):
     df_mes_completo['CUSTO_TOTAL_LINHA'] = df_mes_completo['CUSTO_VAR'] + CUSTO_HW_5MIN + (CUSTO_GLOBAL_5MIN / qtd_servidores_intervalo)
     
     barras_datacenter = (
-        df_mes_completo.groupby(['DATACENTER', 'ZONA'])
+        df_mes_completo.groupby('DATACENTER')
         .agg(
             custo=('CUSTO_VAR', 'sum'),                
             custo_total=('CUSTO_TOTAL_LINHA', 'sum'),   
@@ -467,7 +483,7 @@ def dashFinanceiro(event, context):
             custo         = lambda x: x['custo'].round(2),
             custo_energia = lambda x: x['custo_energia'].round(2),
             percentual = lambda x: (x['custo'] / x['custo'].sum() * 100).round(1),
-            datacenter = lambda x: x['DATACENTER'].astype(str).str.split('-').str[0],
+            datacenter = lambda x: x['DATACENTER'],
             zona = lambda x: x['ZONA'],
             status = lambda x: 'ativo'
         )
@@ -484,7 +500,7 @@ def dashFinanceiro(event, context):
     top_zonas = (
         zonas_agg
         .assign(
-            datacenter  = lambda x: x['DATACENTER'].astype(str).str.split('-').str[0],
+            datacenter  = lambda x: x['DATACENTER'],
             zona        = lambda x: x['ZONA'],
             custo_total = lambda x: x['custo_total'].round(2),
             energia     = lambda x: x['energia'].round(2),
