@@ -1,276 +1,47 @@
 import csv
 import json
 import boto3
+import io  
+import pandas as pd 
 from urllib.parse import unquote_plus
 from datetime import datetime, timedelta
-import pandas as pd
-import requests
-import io
-import os
-
+from statistics import median
 
 s3 = boto3.client('s3')
 
 # Função inicial que chama as demais
 def lambda_handler(event, context):
-    print("Lambda Iniciada!" )
+    print("Lambda Op Iniciada! 🪧")
     print(f"Evento recebido: {event}")
-
-    #Verifica se é o JSON de metricas
-    registro = event["Records"][0]["s3"]
-    key = unquote_plus(registro["object"]["key"])
-    if key.lower().endswith(".json"):
-        return f"Arquivo JSON detectado ({key}). Processamento ignorado."
-        
+    
     try:
-        print("Iniciando Trusted")
-        resultado_trusted = TrustedCsv(event, context)
-
-        if isinstance(resultado_trusted, dict) and "chave" in resultado_trusted:
-            print(f"Sucesso Trusted: {resultado_trusted['mensagem']}")
-            
-            resultado_client = ClientGeral(resultado_trusted['bucket'], resultado_trusted['chave'])
-            print(f"Status ClientGeral: {resultado_client}")
-            
-            return {
-                "statusCode": 200,
-                "body": "Pipeline completo executado com sucesso."
-            }
-        else:
-            print(f"Aviso Trusted: {resultado_trusted}")
-            return {
-                "statusCode": 200,
-                "body": resultado_trusted
-            }
-    except Exception as e:
-        print(f"Erro fatal: {e}")
+        # Desempacota a mensagem do SNS
+        mensagem_sns_texto = event["Records"][0]["Sns"]["Message"]
+        evento_s3_real = json.loads(mensagem_sns_texto)
+        
+        if evento_s3_real.get("Event") == "s3:TestEvent":
+            print("Evento de teste do S3 ignorado")
+            return {"statusCode": 200,"body": "TestEvent ignorado"}
+        registro = evento_s3_real["Records"][0]["s3"]
+        bucket = registro["bucket"]["name"]
+        key = unquote_plus(registro["object"]["key"])
+        
+        resultado_processamento = ClientGeral(bucket, key)
+        
         return {
-            "statusCode": 500,
-            "body": str(e)
+            "statusCode": 200,
+            "body": resultado_processamento
         }
 
-
-def TrustedCsv(event, context):
-    registro = event["Records"][0]["s3"]
-    bucket = registro["bucket"]["name"]
-    key = unquote_plus(registro["object"]["key"])
-
-    if key.endswith("/") or registro["object"]["size"] == 0:
-        return f"Ignorado: {key} é um diretório ou arquivo vazio."
-
-    nome_arquivo = key.split("/")[-1]
-
-    caminho_local_entrada = f"/tmp/{nome_arquivo}"
-    caminho_local_mestre = "/tmp/dados_mestre.csv"
-    chave_destino_mestre = "trusted/dados_tratados.csv"
-
-    print(f"Baixando o arquivo entrada: {key}")
-    s3.download_file(bucket, key, caminho_local_entrada)
-
-    colunas_finais = {
-        "EMPRESA": "EMPRESA",
-        "REGIAO": "REGIAO",
-        "DATACENTER": "DATACENTER",
-        "ZONA": "ZONA",
-        "SERVIDOR": "SERVIDOR",
-        "CPU": "CPU_PER",
-        "QTD_NUCLEOS": "QTD_NUCLEOS",
-        "RAM_TOTAL_GB": "RAM_TOTAL",
-        "RAM_USADA_GB": "RAM_USADO",
-        "RAM_PERCENT": "RAM_PER",
-        "DISCO_TOTAL_GB": "DISCO_TOTAL",
-        "DISCO_USADO_GB": "DISCO_USADO",
-        "DISCO_PERCENT": "DISCO_PER",
-        "LATENCIA": "LATENCIA",
-        "PACOTES_ENVIADOS": "PACOTES_ENV",
-        "PACOTES_RECEBIDOS": "PACOTES_RCB",
-        "PACOTES_PERDIDOS": "PACOTES_PER",
-        "QTD_PR": "QTR_PR",
-        "USO_USER": "USO_USER",
-        "USO_SISTEM": "USO_SISTEM",
-        "PROCESSO1_CPU": "PROCESSO01_CPU_N",
-        "PORCENTAGEM_PROCESSO1_CPU": "PROCESSO1_CPU_P",
-        "PROCESSO2_CPU": "PROCESSO2_CPU_N",
-        "PORCENTAGEM_PROCESSO2_CPU": "PROCESSO2_CPU_P",
-        "PROCESSO3_CPU": "PROCESSO3_CPU_N",
-        "PORCENTAGEM_PROCESSO3_CPU": "PROCESSO3_CPU_P",
-        "PROCESSO1_RAM": "PROCESSO01_RAM_N",
-        "PROCESSO1_RAM_GB": "PROCESSO1_RAM_T",
-        "PROCESSO1_RAM_PERC": "PROCESSO1_RAM_P",
-        "PROCESSO2_RAM": "PROCESSO2_RAM_N",
-        "PROCESSO2_RAM_GB": "PROCESSO2_RAM_T",
-        "PROCESSO2_RAM_PERC": "PROCESSO2_RAM_P",
-        "PROCESSO3_RAM": "PROCESSO3_RAM_N",
-        "PROCESSO3_RAM_GB": "PROCESSO3_RAM_T",
-        "PROCESSO3_RAM_PERC": "PROCESSO3_RAM_P",
-        "BOOTTIME_DT": "BOOTTIME",
-        "DATA_HORA": "DATE",
-        "UPTIME": "UPTIME",
-        "HORA_TRATAMENTO": "HORA_TRATAMENTO",
-        "DIA_SEMANA": "DIA_SEMANA",
-        "JOGADORES_ATIVOS": "JOGADORES_ATIVOS"
-    }
-
-    limite_tempo7 = datetime.now() - timedelta(days=7)
-
-    df = pd.read_csv(caminho_local_entrada, delimiter=";", encoding="utf-8-sig")
-    df.columns = df.columns.str.strip()
-
-    if df.empty:
-        return f"Arquivo {nome_arquivo} processado, mas não contém dados."
-
-    if "DATA_HORA" not in df.columns:
-        return f"Arquivo {nome_arquivo} ignorado: coluna DATA_HORA não encontrada."
-
-    df["DATA_HORA"] = pd.to_datetime(df["DATA_HORA"], errors="coerce")
-    df = df.dropna(subset=["DATA_HORA"])
-
-    df = df[df["DATA_HORA"] >= limite_tempo7]
-
-    if df.empty:
-        return f"Arquivo {nome_arquivo} lido, mas nenhuma linha se qualificou dentro de 7 dias."
-
-    colunas_obrigatorias = [
-        "EMPRESA",
-        "REGIAO",
-        "DATACENTER",
-        "ZONA",
-        "SERVIDOR",
-        "CPU",
-        "RAM_TOTAL",
-        "RAM_USADA",
-        "RAM_PERCENT",
-        "DISCO_TOTAL",
-        "DISCO_USADO",
-        "DISCO_PERCENT",
-        "LATENCIA",
-        "BOOTTIME"
-    ]
-
-    colunas_faltando = [
-        coluna for coluna in colunas_obrigatorias
-        if coluna not in df.columns
-    ]
-
-    if colunas_faltando:
-        return f"Arquivo {nome_arquivo} ignorado. Colunas obrigatórias faltando: {colunas_faltando}"
-
-    colunas_numericas = [
-        "RAM_TOTAL",
-        "RAM_USADA",
-        "DISCO_TOTAL",
-        "DISCO_USADO",
-        "LATENCIA",
-        "BOOTTIME",
-        "PORCENTAGEM_PROCESSO1_RAM",
-        "PORCENTAGEM_PROCESSO2_RAM",
-        "PORCENTAGEM_PROCESSO3_RAM"
-    ]
-
-    for coluna in colunas_numericas:
-        if coluna in df.columns:
-            df[coluna] = (
-                df[coluna]
-                .astype(str)
-                .str.replace(",", ".", regex=False)
-            )
-            df[coluna] = pd.to_numeric(df[coluna], errors="coerce").fillna(0)
-
-    df["RAM_TOTAL_GB"] = (df["RAM_TOTAL"] / (1024 ** 3)).round(2)
-    df["RAM_USADA_GB"] = (df["RAM_USADA"] / (1024 ** 3)).round(2)
-    df["DISCO_TOTAL_GB"] = (df["DISCO_TOTAL"] / (1024 ** 3)).round(2)
-    df["DISCO_USADO_GB"] = (df["DISCO_USADO"] / (1024 ** 3)).round(2)
-    df["LATENCIA"] = df["LATENCIA"].round(2)
-
-    if "PORCENTAGEM_PROCESSO1_RAM" in df.columns:
-        df["PROCESSO1_RAM_GB"] = (df["PORCENTAGEM_PROCESSO1_RAM"] / (1024 ** 3)).round(2)
-    else:
-        df["PROCESSO1_RAM_GB"] = 0.0
-
-    if "PORCENTAGEM_PROCESSO2_RAM" in df.columns:
-        df["PROCESSO2_RAM_GB"] = (df["PORCENTAGEM_PROCESSO2_RAM"] / (1024 ** 3)).round(2)
-    else:
-        df["PROCESSO2_RAM_GB"] = 0.0
-
-    if "PORCENTAGEM_PROCESSO3_RAM" in df.columns:
-        df["PROCESSO3_RAM_GB"] = (df["PORCENTAGEM_PROCESSO3_RAM"] / (1024 ** 3)).round(2)
-    else:
-        df["PROCESSO3_RAM_GB"] = 0.0
-
-    df["PROCESSO1_RAM_PERC"] = (
-        ((df["PROCESSO1_RAM_GB"] * 100) / df["RAM_TOTAL_GB"])
-        .where(df["RAM_TOTAL_GB"] > 0, 0.0)
-        .round(2)
-    )
-
-    df["PROCESSO2_RAM_PERC"] = (
-        ((df["PROCESSO2_RAM_GB"] * 100) / df["RAM_TOTAL_GB"])
-        .where(df["RAM_TOTAL_GB"] > 0, 0.0)
-        .round(2)
-    )
-
-    df["PROCESSO3_RAM_PERC"] = (
-        ((df["PROCESSO3_RAM_GB"] * 100) / df["RAM_TOTAL_GB"])
-        .where(df["RAM_TOTAL_GB"] > 0, 0.0)
-        .round(2)
-    )
-
-    df["BOOTTIME_DT"] = df["BOOTTIME"].apply(datetime.fromtimestamp)
-    df["UPTIME"] = (df["DATA_HORA"] - df["BOOTTIME_DT"]).astype(str)
-    df["HORA_TRATAMENTO"] = str(datetime.now())
-
-    for coluna in colunas_finais.keys():
-        if coluna not in df.columns:
-            df[coluna] = ""
-
-    df = df[list(colunas_finais.keys())].rename(columns=colunas_finais)
-
-    df_mestre = pd.DataFrame()
-
-    try:
-        print(f"Tentando ler arquivo mestre existente: {chave_destino_mestre}")
-        resposta_mestre = s3.get_object(Bucket=bucket, Key=chave_destino_mestre)
-        conteudo_mestre = resposta_mestre["Body"].read().decode("utf-8")
-        df_mestre = pd.read_csv(io.StringIO(conteudo_mestre), delimiter=";")
-        print(f"Arquivo mestre carregado com {len(df_mestre)} linhas.")
     except Exception as e:
-        print(f"Arquivo mestre não encontrado ou inválido. Criando um novo do zero. Erro: {e}")
-
-    df_unificado = pd.concat([df_mestre, df], ignore_index=True)
-
-    if "DATE" not in df_unificado.columns:
-        return "Erro: coluna DATE não encontrada no arquivo unificado."
-
-    df_unificado["DATE"] = pd.to_datetime(df_unificado["DATE"], errors="coerce")
-    df_unificado = df_unificado.dropna(subset=["DATE"])
-    df_unificado = df_unificado[df_unificado["DATE"] >= limite_tempo7]
-
-    df_unificado = df_unificado.drop_duplicates(
-        subset=["EMPRESA", "DATACENTER", "ZONA", "SERVIDOR", "DATE"],
-        keep="last"
-    )
-
-    df_unificado.to_csv(
-        caminho_local_mestre,
-        sep=";",
-        index=False,
-        encoding="utf-8"
-    )
-
-    print(f"Fazendo upload do CSV unificado para: {chave_destino_mestre}")
-    s3.upload_file(caminho_local_mestre, bucket, chave_destino_mestre)
-
-    return {
-        "mensagem": f"Arquivo unificado. Adicionadas {len(df)} novas linhas. Total agora: {len(df_unificado)}",
-        "bucket": bucket,
-        "chave": chave_destino_mestre
-    }
-
-#funcao que crrega as métricas de cada componente daquele datacenter
+        print(f"❌ Erro fatal na execução da Lambda: {e}")
+        return {
+            "statusCode": 500,
+            "body": f"Erro interno: {str(e)}"
+        }
+    
 def carregarMetricasJson(bucket):
     try:
-        s3 = boto3.client("s3")
-
         resposta = s3.get_object(
             Bucket=bucket,
             Key="raw/metricas.json"
@@ -286,7 +57,6 @@ def carregarMetricasJson(bucket):
         print(f"⚠️ Erro ao carregar metricas.json: {e}")
         return {}
     
-#Função de envio dos JSON para o Client
 def ClientGeral(bucket, chave):
     print(f"Lendo arquivo Trusted no S3: {chave}")
     
@@ -302,30 +72,14 @@ def ClientGeral(bucket, chave):
 
     s3.put_object(
         Bucket=bucket,
-        Key="client/gestoraOp_master.json",
+        Key="client/dashOpGestao.json",
         Body=json.dumps(respGestoraOp, default=str, indent=4),
         ContentType="application/json"
     )
 
-    print("Todas as paginas processadas e atualizadas.")
+    print("Todas as paginas processadas e atualizadas. 🟩")
     return "Lambda concluida com sucesso! ✅"
-    
 
-# ZONA DE TRABALHO
-
-def dashGestora(dados):
-    
-    return {"tipo": "gestora", "total_dados": len(dados)}
-
-def dashAnalista(dados):
-    return {"tipo": "analista", "total_dados": len(dados)}
-
-def dashServidores(dados):
-    return {"tipo": "analista", "total_dados": len(dados)}
-
-
-
-###########################################################DASHBOARD OPERACIONAL GESTOR####################################################################
 #SCORE SAUDE SERVIDOR
 LIMITE_CPU = 80
 LIMITE_RAM = 85
@@ -385,16 +139,6 @@ def calcularPenalidadeLatencia(persistencia):
         return 6
     elif persistencia < 0.80:
         return 8
-    return 10
-
-
-def calcularPenalidadeTendencia(queda):
-    if queda < 5:
-        return 0
-    elif queda < 10:
-        return 3
-    elif queda < 20:
-        return 6
     return 10
 
 
@@ -473,7 +217,7 @@ def calcularScoreParcial(janela,limites):
 
     return max(0, min(100, score_parcial))
 
-
+#SCORE DE SAUDE SERVIDOR
 def calcularScoreServidor(coletaServidor, limites):
     if not coletaServidor:
         return {
@@ -482,71 +226,101 @@ def calcularScoreServidor(coletaServidor, limites):
             "scoreParcialAtual": 100,
             "scoreParcialAnterior": 100,
             "queda": 0,
-            "penalidadeTendencia": 0,
             "projecaoSaude": {
                 "scoreAtual": 100,
                 "scoreProjetado": 100,
+                "scoreParcialProjetado": 100,
+                "degradacaoProjetada": 0,
                 "risco": "Saudável",
+                "horizonteColetas": 0,
+                "horizonteMinutos": 0,
+                "confiabilidade": "insuficiente",
                 "motivo": "Sem dados suficientes para projeção",
-                "componentesTendencia": [],
-                "penalidadeProjecao": 0
+                "componentesTendencia": []
             }
         }
 
-    coletas_ordenadas = sorted(
+    coletasOrdenadas = sorted(
         coletaServidor,
-        key=lambda coleta: str(coleta.get("DATE", ""))
+        key=lambda coleta: pd.to_datetime(
+            coleta.get("DATE"),
+            errors="coerce"
+        )
     )
 
-    ultimas60Linhas = coletas_ordenadas[-60:]
+    ultimas60Linhas = coletasOrdenadas[-60:]
 
-    janelaAnterior = ultimas60Linhas[-60:-30]
-    janelaAtual = ultimas60Linhas[-30:]
+    if len(ultimas60Linhas) >= 60:
+        janelaAnterior = ultimas60Linhas[:30]
+        janelaAtual = ultimas60Linhas[30:]
 
-    scoreParcialAnterior = calcularScoreParcial(janelaAnterior, limites)
-    scoreParcialAtual = calcularScoreParcial(janelaAtual, limites)
+    elif len(ultimas60Linhas) >= 40:
+        metade = len(ultimas60Linhas) // 2
+
+        janelaAnterior = ultimas60Linhas[:metade]
+        janelaAtual = ultimas60Linhas[metade:]
+
+    else:
+        janelaAnterior = []
+        janelaAtual = ultimas60Linhas[-30:]
+
+    scoreParcialAtual = calcularScoreParcial(
+        janelaAtual,
+        limites
+    )
+
+    if janelaAnterior:
+        scoreParcialAnterior = calcularScoreParcial(janelaAnterior,limites)
+    else:
+        scoreParcialAnterior = scoreParcialAtual
 
     queda = scoreParcialAnterior - scoreParcialAtual
+    scoreFinal = max(0,min(100, scoreParcialAtual))
 
-    penalidadeTendencia = calcularPenalidadeTendencia(queda)
+    resultadoProjecao = construirJanelaProjetada(janelaAnterior,janelaAtual,limites,horizonteColetas=QUANTIDADE_COLETAS_PROJETADAS)
+    janelaProjetada = resultadoProjecao["janelaProjetada"]
+    componentesTendencia = resultadoProjecao["componentesTendencia"]
 
-    scoreFinal = scoreParcialAtual - penalidadeTendencia
-    scoreFinal = max(0, min(100, scoreFinal))
+    if componentesTendencia and len(janelaProjetada) >= 20:
+        scoreParcialProjetado = calcularScoreParcial(janelaProjetada,limites)
 
-    componentesTendencia = calcularTendenciaComponentes(
-    janelaAnterior,
-    janelaAtual,
-    limites)
+  
+        scoreProjetado = min(scoreFinal,scoreParcialProjetado)
 
-    penalidadeProjecao = calcularPenalidadeProjecao(componentesTendencia)
+    else:
+        scoreParcialProjetado = scoreParcialAtual
+        scoreProjetado = scoreFinal
 
-    scoreProjetado = scoreFinal - penalidadeProjecao
-    scoreProjetado = max(0, min(100, scoreProjetado))
-    
+    scoreProjetado = max(0,min(100, scoreProjetado))
+
+    degradacaoProjetada = max(0,scoreFinal - scoreProjetado)
     motivoProjecao = gerarMotivoProjecao(componentesTendencia)
 
-    print("\nPROJEÇÃO")
-    print("Score Atual:", scoreFinal)
-    print("Score Projetado:", scoreProjetado)
-    print("Motivo:", motivoProjecao)
-    print("Componentes:", componentesTendencia)
     return {
         "score": round(scoreFinal, 2),
         "status": classificarStatusScore(scoreFinal),
         "scoreParcialAtual": round(scoreParcialAtual, 2),
         "scoreParcialAnterior": round(scoreParcialAnterior, 2),
         "queda": round(queda, 2),
-        "penalidadeTendencia": penalidadeTendencia,
         "projecaoSaude": {
             "scoreAtual": round(scoreFinal, 2),
             "scoreProjetado": round(scoreProjetado, 2),
+            "scoreParcialProjetado": round(scoreParcialProjetado,2),
+            "degradacaoProjetada": round(degradacaoProjetada,2),
             "risco": classificarStatusScore(scoreProjetado),
+            "horizonteColetas": resultadoProjecao[
+                "horizonteColetas"
+            ],
+            "horizonteMinutos": resultadoProjecao[
+                "horizonteMinutos"
+            ],
+            "confiabilidade": resultadoProjecao[
+                "confiabilidade"
+            ],
             "motivo": motivoProjecao,
-            "componentesTendencia": componentesTendencia,
-            "penalidadeProjecao": penalidadeProjecao
+            "componentesTendencia": componentesTendencia
         }
     }
-   
 
 #SCORE SAUDE ZONA 
 def calcularScoreZona(servidoresZona):
@@ -555,7 +329,11 @@ def calcularScoreZona(servidoresZona):
     if total == 0:
         return {
             "score": 100,
-            "status": "Saudável"
+            "status": "Saudável",
+            "qntServidores": 0,
+            "qntCriticos": 0,
+            "qntAtencao": 0,
+            "srvPiorScore": 100
         }
 
     qntCriticos = 0
@@ -563,8 +341,15 @@ def calcularScoreZona(servidoresZona):
     srvPiorScore = 100
 
     for servidor in servidoresZona:
-        score = servidor["score"]
-        status = servidor["status"]
+        score = converter_float(
+            servidor.get("score"),
+            100
+        )
+
+        status = servidor.get(
+            "status",
+            "Saudável"
+        )
 
         if status == "Crítico":
             qntCriticos += 1
@@ -574,59 +359,49 @@ def calcularScoreZona(servidoresZona):
         if score < srvPiorScore:
             srvPiorScore = score
 
-    percentCriticos = qntCriticos / total
-    percentAtencao = qntAtencao / total
+    percentualCriticos = qntCriticos / total
+    percentualAtencao = qntAtencao / total
+    penalidadeCriticos = percentualCriticos * 45
+    penalidadeAtencao = percentualAtencao * 20
 
-    if percentCriticos > 0.40:
-        penalidadeCritico = 40
-    elif percentCriticos > 0.25:
-        penalidadeCritico = 30
-    elif percentCriticos > 0.10:
-        penalidadeCritico = 20
-    elif percentCriticos > 0:
-        penalidadeCritico = 10
+    if srvPiorScore < 80:
+        penalidadePiorServidor = (80 - srvPiorScore) * 0.30
     else:
-        penalidadeCritico = 0
+        penalidadePiorServidor = 0
 
-    if percentAtencao > 0.50:
-        penalidadeAtencao = 15
-    elif percentAtencao > 0.25:
-        penalidadeAtencao = 10
-    elif percentAtencao > 0:
-        penalidadeAtencao = 5
+    penalidadePiorServidor = min(penalidadePiorServidor,20)
+
+    if total == 1:
+        scoreZona = srvPiorScore
     else:
-        penalidadeAtencao = 0
+        scoreZona = (100- penalidadeCriticos - penalidadeAtencao- penalidadePiorServidor)
 
-    if srvPiorScore < 40:
-        penalidadePiorSrv = 15
-    elif srvPiorScore < 60:
-        penalidadePiorSrv = 10
-    elif srvPiorScore < 80:
-        penalidadePiorSrv = 5
-    else:
-        penalidadePiorSrv = 0
-
-    score_zona = 100 - penalidadeCritico - penalidadeAtencao - penalidadePiorSrv
-    score_zona = max(0, min(100, score_zona))
+    scoreZona = max(0,min(100, scoreZona))
 
     return {
-        "score": round(score_zona, 2),
-        "status": classificarStatusScore(score_zona),
+        "score": round(scoreZona, 2),
+        "status": classificarStatusScore(scoreZona),
         "qntServidores": total,
         "qntCriticos": qntCriticos,
         "qntAtencao": qntAtencao,
-        "srvPiorScore": round(srvPiorScore, 2)
+        "percentualCriticos": round(percentualCriticos * 100,2),
+        "percentualAtencao": round( percentualAtencao * 100,2),
+        "srvPiorScore": round(srvPiorScore,2)
     }
 
-#SCORE SAUDE DATACENTER 
 
+#SCORE SAUDE DATACENTER 
 def calcularScoreDatacenter(zonas):
     total = len(zonas)
 
     if total == 0:
         return {
             "score": 100,
-            "status": "Saudável"
+            "status": "Saudável",
+            "qntZonas": 0,
+            "qntZonasCriticas": 0,
+            "qntZonasAtencao": 0,
+            "zonaPiorScore": 100
         }
 
     qntCriticos = 0
@@ -634,8 +409,8 @@ def calcularScoreDatacenter(zonas):
     zonaPiorScore = 100
 
     for zona in zonas:
-        score = zona["score"]
-        status = zona["status"]
+        score = converter_float(zona.get("score"), 100)
+        status = zona.get("status", "Saudável")
 
         if status == "Crítico":
             qntCriticos += 1
@@ -645,47 +420,41 @@ def calcularScoreDatacenter(zonas):
         if score < zonaPiorScore:
             zonaPiorScore = score
 
-    percentCriticos = qntCriticos / total
-    percentAtencao = qntAtencao / total
+    percentualCriticos = qntCriticos / total
+    percentualAtencao = qntAtencao / total
 
-    if percentCriticos > 0.50:
-        penalidadeCritico = 40
-    elif percentCriticos > 0.25:
-        penalidadeCritico = 25
-    elif percentCriticos > 0:
-        penalidadeCritico = 15
-    else:
-        penalidadeCritico = 0
+    penalidadeCriticos = percentualCriticos * 45
+    penalidadeAtencao = percentualAtencao * 20
 
-    if percentAtencao > 0.50:
-        penalidadeAtencao = 15
-    elif percentAtencao > 0:
-        penalidadeAtencao = 8
-    else:
-        penalidadeAtencao = 0
-
-    if zonaPiorScore < 40:
-        penalidadePiorZona = 20
-    elif zonaPiorScore < 60:
-        penalidadePiorZona = 12
-    elif zonaPiorScore < 80:
-        penalidadePiorZona = 6
+    if zonaPiorScore < 80:
+        penalidadePiorZona = (80 - zonaPiorScore) * 0.30
     else:
         penalidadePiorZona = 0
 
-    score_datacenter = 100 - penalidadeCritico - penalidadeAtencao - penalidadePiorZona
-    score_datacenter = max(0, min(100, score_datacenter))
+    penalidadePiorZona = min(penalidadePiorZona, 20)
+
+    if total == 1:
+        scoreDatacenter = zonaPiorScore
+    else:
+        scoreDatacenter = (100 - penalidadeCriticos- penalidadeAtencao- penalidadePiorZona)
+
+    scoreDatacenter = max(0, min(100, scoreDatacenter))
 
     return {
-        "score": round(score_datacenter, 2),
-        "status": classificarStatusScore(score_datacenter),
+        "score": round(scoreDatacenter, 2),
+        "status": classificarStatusScore(scoreDatacenter),
         "qntZonas": total,
         "qntZonasCriticas": qntCriticos,
         "qntZonasAtencao": qntAtencao,
-        "zonaPiorScore": round(zonaPiorScore, 2)
+        "percentualZonasCriticas": round(percentualCriticos * 100,2),
+        "percentualZonasAtencao": round(percentualAtencao * 100,2),
+        "zonaPiorScore": round(zonaPiorScore, 2),
+        "penalidades": {
+            "zonasCriticas": round(penalidadeCriticos, 2),
+            "zonasAtencao": round(penalidadeAtencao, 2),
+            "piorZona": round(penalidadePiorZona, 2)
+        }
     }
-
-#SAUDE REGIÃO
 
 # SCORE SAÚDE REGIÃO
 def calcularScoreRegiao(datacentersRegiao):
@@ -698,6 +467,8 @@ def calcularScoreRegiao(datacentersRegiao):
             "qntDatacenters": 0,
             "qntDatacentersCriticos": 0,
             "qntDatacentersAtencao": 0,
+            "percentualDatacentersCriticos": 0,
+            "percentualDatacentersAtencao": 0,
             "datacenterPiorScore": 100
         }
 
@@ -706,8 +477,15 @@ def calcularScoreRegiao(datacentersRegiao):
     datacenterPiorScore = 100
 
     for datacenter in datacentersRegiao:
-        score = datacenter["score"]
-        status = datacenter["status"]
+        score = converter_float(
+            datacenter.get("score"),
+            100
+        )
+
+        status = datacenter.get(
+            "status",
+            "Saudável"
+        )
 
         if status == "Crítico":
             qntCriticos += 1
@@ -717,68 +495,49 @@ def calcularScoreRegiao(datacentersRegiao):
         if score < datacenterPiorScore:
             datacenterPiorScore = score
 
-    percentCriticos = qntCriticos / total
-    percentAtencao = qntAtencao / total
+    percentualCriticos = qntCriticos / total
+    percentualAtencao = qntAtencao / total
+    penalidadeCriticos = percentualCriticos * 45
+    penalidadeAtencao = percentualAtencao * 20
 
-    if percentCriticos > 0.50:
-        penalidadeCritico = 45
-    elif percentCriticos > 0.25:
-        penalidadeCritico = 30
-    elif percentCriticos > 0:
-        penalidadeCritico = 18
-    else:
-        penalidadeCritico = 0
-
-    if percentAtencao > 0.50:
-        penalidadeAtencao = 18
-    elif percentAtencao > 0.25:
-        penalidadeAtencao = 12
-    elif percentAtencao > 0:
-        penalidadeAtencao = 6
-    else:
-        penalidadeAtencao = 0
-
-    if datacenterPiorScore < 40:
-        penalidadePiorDatacenter = 22
-    elif datacenterPiorScore < 60:
-        penalidadePiorDatacenter = 14
-    elif datacenterPiorScore < 80:
-        penalidadePiorDatacenter = 7
+    if datacenterPiorScore < 80:
+        penalidadePiorDatacenter = (80 - datacenterPiorScore) * 0.20
     else:
         penalidadePiorDatacenter = 0
 
-    score_regiao = (
-        100
-        - penalidadeCritico
-        - penalidadeAtencao
-        - penalidadePiorDatacenter
-    )
+    penalidadePiorDatacenter = min(penalidadePiorDatacenter,15)
 
-    score_regiao = max(0, min(100, score_regiao))
+    if total == 1:
+        scoreRegiao = datacenterPiorScore
+    else:
+        scoreRegiao = ( 100- penalidadeCriticos - penalidadeAtencao - penalidadePiorDatacenter)
+
+    scoreRegiao = max(0,min(100, scoreRegiao))
 
     return {
-        "score": round(score_regiao, 2),
-        "status": classificarStatusScore(score_regiao),
+        "score": round(scoreRegiao, 2),
+        "status": classificarStatusScore(scoreRegiao),
         "qntDatacenters": total,
         "qntDatacentersCriticos": qntCriticos,
         "qntDatacentersAtencao": qntAtencao,
-        "datacenterPiorScore": round(datacenterPiorScore, 2)
+        "percentualDatacentersCriticos": round(percentualCriticos * 100,2),
+        "percentualDatacentersAtencao": round(percentualAtencao * 100,2),
+        "datacenterPiorScore": round(datacenterPiorScore,2),
+        "penalidades": {
+            "datacentersCriticos": round(penalidadeCriticos,2),
+            "datacentersAtencao": round(penalidadeAtencao,2),
+            "piorDatacenter": round(penalidadePiorDatacenter,2)
+        }
     }
 #------------------------------------------------------------------------------------------------------------------------------------------------
 #Projecao de score e tendencia de componentesque vão aumentar criticamente
 
-#calculando a média de cada componente
-def calcularMediaComponente(janela, campo):
-    if not janela:
-        return 0
-
-    soma = 0
-
-    for coleta in janela:
-        soma += converter_float(coleta.get(campo))
-
-    return soma / len(janela)
-
+QUANTIDADE_COLETAS_PROJETADAS = 10
+ALPHA_EWMA = 0.30 #
+MINIMO_COLETAS_TENDENCIA = 20
+MINIMO_CONCORDANCIA_TENDENCIA = 0.65
+MINIMA_EVOLUCAO_RECENTE = 0.03
+MINIMA_MUDANCA_PROJETADA = 0.05
 
 
 #def que calcula a persistencia de uso de cada componente e a sua relação com o limite dele
@@ -797,158 +556,392 @@ def calcularPersistenciaComponente(janela, campo, limite):
     return qntColetasCriticas / len(janela)
 
 
-def obterPesoComponente(nomeComponente):
-    pesos = {
-        "CPU": 1.0,
-        "RAM": 1.2,
-        "Disco": 1.3,
-        "Latência": 0.9
-    }
-
-    return pesos.get(nomeComponente, 1.0)
-
-#def que calcula a tendencia do socmponentes levando em consideração a persistencia atual comparando com a anterior e tambḿe com amédia de uso de cadac coponente da atual vs anterior, com um peso para cada situação
-def calcularTendenciaComponentes(janelaAnterior, janelaAtual, limites):
-
-    if len(janelaAnterior) < 10 or len(janelaAtual) < 10:
-        return []
-
-    limiteCpu = converter_float(limites.get("CPU"), LIMITE_CPU)
-    limiteRam = converter_float(limites.get("RAM"), LIMITE_RAM)
-    limiteDisco = converter_float(limites.get("DISCO"), LIMITE_DISCO)
-    limiteLatencia = converter_float(limites.get("REDE"), LIMITE_LATENCIA)
-
-    componentes = [
+# def que armazena os valores do componente e os seus limites para faciltar os calculos que os usam
+def obterConfigComponentes(limites):
+    return [
         {
             "nome": "CPU",
             "campo": "CPU_PER",
-            "limite": limiteCpu
+            "limite": converter_float(limites.get("CPU"),LIMITE_CPU),
+            "minimo": 0,
+            "maximo": 100
         },
         {
             "nome": "RAM",
             "campo": "RAM_PER",
-            "limite": limiteRam
+            "limite": converter_float(limites.get("RAM"),LIMITE_RAM),
+            "minimo": 0,
+            "maximo": 100
         },
         {
             "nome": "Disco",
             "campo": "DISCO_PER",
-            "limite": limiteDisco
+            "limite": converter_float(limites.get("DISCO"),LIMITE_DISCO),
+            "minimo": 0,
+            "maximo": 100
         },
         {
             "nome": "Latência",
             "campo": "LATENCIA",
-            "limite": limiteLatencia
+            "limite": converter_float(limites.get("REDE"),LIMITE_LATENCIA),
+            "minimo": 0,
+            "maximo": None
         }
     ]
 
-    tendencias = []
+# def que permite que os compoenntes sejam analisados na mesma métrica, normalizando eles dividindo o valor coletado pelo limite do componente
+def extrairSerieComponente(janela, campo, limite):
+    if not janela or limite <= 0:
+        return [], [], []
 
-    for componente in componentes:
+    valoresReais = []
+    valoresNormalizados = []
+    datas = []
 
-        persistenciaAnterior = calcularPersistenciaComponente(
-            janelaAnterior,
-            componente["campo"],
-            componente["limite"]
-        )
+    for coleta in janela:
+        valor = converter_float(coleta.get(campo),padrao=None)
+        data = coleta.get("DATE")
 
-        persistenciaAtual = calcularPersistenciaComponente(
-            janelaAtual,
-            componente["campo"],
-            componente["limite"]
-        )
+        if valor is None or data is None:
+            continue
 
-        aumentoPersistencia = persistenciaAtual - persistenciaAnterior
+        try:
+            dataConvertida = pd.to_datetime(
+                data,
+                errors="raise"
+            )
 
-        mediaAtual = calcularMediaComponente(
-            janelaAtual,
-            componente["campo"]
-        )
+            if isinstance(dataConvertida, pd.Timestamp):
+                dataConvertida = dataConvertida.to_pydatetime()
 
-        if componente["limite"] > 0:
-            proximidadeLimite = mediaAtual / componente["limite"]
-        else:
-            proximidadeLimite = 0
+            if dataConvertida.tzinfo is not None:
+                dataConvertida = dataConvertida.replace(tzinfo=None)
 
-        riscoTendencia = 0
+        except Exception:
+            continue
 
-        if aumentoPersistencia >= 0.50:
-            riscoTendencia += 15
-        elif aumentoPersistencia >= 0.30:
-            riscoTendencia += 10
-        elif aumentoPersistencia >= 0.15:
-            riscoTendencia += 5
+        valoresReais.append(valor)
+        valoresNormalizados.append(valor / limite)
+        datas.append(dataConvertida)
 
-        if persistenciaAtual >= 0.80:
-            riscoTendencia += 8
-        elif persistenciaAtual >= 0.60:
-            riscoTendencia += 5
-        elif persistenciaAtual >= 0.40:
-            riscoTendencia += 3
+    if len(datas) < 2:
+        return [], [], []
 
-        if proximidadeLimite >= 1:
-            riscoTendencia += 10
-        elif proximidadeLimite >= 0.90:
-            riscoTendencia += 7
-        elif proximidadeLimite >= 0.80:
-            riscoTendencia += 4
+    primeiraData = datas[0]
 
-        pesoComponente = obterPesoComponente(componente["nome"])
-        riscoTendencia = riscoTendencia * pesoComponente
+    temposMinutos = [
+        (data - primeiraData).total_seconds() / 60
+        for data in datas
+    ]
 
-        if riscoTendencia >= 5:
-            tendencias.append({
-                "componente": componente["nome"],
-                "persistenciaAnterior": round(persistenciaAnterior * 100, 2),
-                "persistenciaAtual": round(persistenciaAtual * 100, 2),
-                "aumentoPersistencia": round(aumentoPersistencia * 100, 2),
-                "mediaAtual": round(mediaAtual, 2),
-                "proximidadeLimite": round(proximidadeLimite, 2),
-                "riscoTendencia": round(riscoTendencia, 2)
+    return (valoresReais,valoresNormalizados,temposMinutos)
+
+# def que coloca o peso de 0.30 na criação da coleta projetada para que ela suavize o valor atual para que não reduza de forma significativa o score no final, por ser um valor projetado em uma pequena janela
+def suavizarSerieEwma(valores, alpha=ALPHA_EWMA):
+    if not valores:
+        return []
+
+    valoresSuavizados = [valores[0]]
+
+    for valor in valores[1:]:
+        valorAnterior = valoresSuavizados[-1]
+
+        valorSuavizado = (alpha * valor+ (1 - alpha) * valorAnterior)
+        valoresSuavizados.append(valorSuavizado)
+
+    return valoresSuavizados
+
+# def que calculo em pares a medina do crescimento dos valores, para que caso aja um pico absurdo de uso ele não afete grandemente o score projetado, mas sim algo mais realista
+def calcularInclinacaoTheilSen(valores, tempos):
+    if len(valores) < 2:
+        return 0
+
+    if len(valores) != len(tempos):
+        return 0
+
+    inclinacoes = []
+
+    for i in range(len(valores)):
+        for j in range(i + 1, len(valores)):
+            diferencaTempo = tempos[j] - tempos[i]
+
+            if diferencaTempo <= 0:
+                continue
+
+            inclinacao = (valores[j] - valores[i]) / diferencaTempo
+            inclinacoes.append(inclinacao)
+
+    if not inclinacoes:
+        return 0
+
+    return median(inclinacoes)
+
+# def que calcula o intervalo mediano entre uma coleta e outra, porque dados como os da API da steam no script de captura podem fazer com que as linhas tenham intervalos diferentes de coletas, o que resulta em linhas coletadas com intervalos diferentes
+def calcularIntervaloMedianoMinutos(tempos):
+    if len(tempos) < 2:
+        return 0
+
+    intervalos = []
+
+    for indice in range(1, len(tempos)):
+        intervalo = tempos[indice] - tempos[indice - 1]
+
+        if intervalo > 0:
+            intervalos.append(intervalo)
+
+    if not intervalos:
+        return 0
+
+    return median(intervalos)
+
+#def que verifica a proporção de pares de pontos cuja inclinação é positiva
+def calcularConcordanciaTendencia(valores,tempos,tolerancia=0.0001):
+    if len(valores) < 2:
+        return 0
+
+    inclinacoesPositivas = 0
+    inclinacoesValidas = 0
+
+    for i in range(len(valores)):
+        for j in range(i + 1, len(valores)):
+            diferencaTempo = tempos[j] - tempos[i]
+
+            if diferencaTempo <= 0:
+                continue
+
+            inclinacao = (valores[j] - valores[i]) / diferencaTempo
+
+            if abs(inclinacao) <= tolerancia:
+                continue
+
+            inclinacoesValidas += 1
+
+            if inclinacao > 0:
+                inclinacoesPositivas += 1
+
+    if inclinacoesValidas == 0:
+        return 0
+
+    return (inclinacoesPositivas/ inclinacoesValidas)
+
+# def que retorna a comparacao entre  a mediana nos valores do inicio e as do fim das 30 coletas, para verificar sem ser afetada por  outiliners a evolução da coleta se aumentou, diminuiu etc
+def calcularEvolucaoRecente(valores):
+    if len(valores) < 12:
+        return 0
+
+    tamanhoTrecho = max(4,len(valores) // 3)
+
+    valoresInicio = valores[:tamanhoTrecho]
+    valoresFim = valores[-tamanhoTrecho:]
+
+    medianaInicio = median(valoresInicio)
+    medianaFim = median(valoresFim)
+
+    return medianaFim - medianaInicio
+
+#def que calcula a ocilação da credibilidade dessa projeção
+def calcularRuidoSerie(valores):
+    if len(valores) < 3:
+        return 0
+
+    diferencas = []
+
+    for indice in range(1, len(valores)):
+        diferencas.append(valores[indice] - valores[indice - 1])
+
+    if not diferencas:
+        return 0
+
+    medianaDiferencas = median(diferencas)
+    desviosAbsolutos = [abs(diferenca - medianaDiferencas) for diferenca in diferencas]
+
+    return median(desviosAbsolutos)
+
+# def que calcula a confiabilidade do componente de acordo com tudo o que calculamos antes, concordanci, evolucao, etc etc
+def calcularConfiabilidadeComponente(concordancia,mudancaProjetada,limiarSinal,evolucaoRecente):
+    pontuacaoConcordancia = min(1,max(0, concordancia)) * 50
+
+    if limiarSinal > 0:
+        relacaoSinal = mudancaProjetada / limiarSinal
+        pontuacaoSinal = min(30, max(0, relacaoSinal - 0.5) * 20)
+    else:
+        pontuacaoSinal = 0
+
+    pontuacaoEvolucao = min(1,max(0, evolucaoRecente) / 0.10) * 20
+
+    confiabilidadeNumerica = (pontuacaoConcordancia+ pontuacaoSinal+ pontuacaoEvolucao)
+
+    if confiabilidadeNumerica >= 80:
+        nivel = "alta"
+    elif confiabilidadeNumerica >= 65:
+        nivel = "moderada"
+    else:
+        nivel = "baixa"
+
+    return {
+        "nivel": nivel,
+        "percentual": round(confiabilidadeNumerica,2)
+    }
+
+# def que quando há uma consistencia de dados na coleta, ex: ram = 90% várias vezes seguidas, não deveria indicar um crescimento, já que permaneceu estável e não subiu, ess função serve para isso
+def obterValorRecenteConservador(janelaAtual,campo,valorMinimo=0,valorMaximo=None):
+    valoresRecentes = []
+
+    for coleta in janelaAtual[-5:]:
+        valor = converter_float(coleta.get(campo),padrao=None)
+
+        if valor is not None:
+            valoresRecentes.append(valor)
+
+    if not valoresRecentes:
+        return valorMinimo
+
+    valor = median(valoresRecentes)
+    valor = max(valorMinimo,valor)
+
+    if valorMaximo is not None:
+        valor = min( valorMaximo,valor)
+
+    return valor
+
+# def que constroi de fato as 10 coletas projetadas, com base em tudo que calculei até o momento para ser uma prjeção mais realista possivel
+def construirJanelaProjetada(janelaAnterior,janelaAtual,limites,horizonteColetas=QUANTIDADE_COLETAS_PROJETADAS):
+    if len(janelaAtual) < MINIMO_COLETAS_TENDENCIA:
+        return {
+            "janelaProjetada": janelaAtual.copy(),
+            "componentesTendencia": [],
+            "todasProjecoes": [],
+            "horizonteColetas": 0,
+            "horizonteMinutos": 0,
+            "confiabilidade": "insuficiente"
+        }
+
+    configuracoes = obterConfigComponentes(limites)
+
+    projecoes = {}
+
+    todasProjecoes = []
+
+    componentesTendencia = []
+
+    for configuracao in configuracoes:
+        resultadoProjecao = projetarComponente(janelaAtual,janelaAnterior,configuracao,horizonteColetas)
+
+        projecoes[configuracao["campo"]] = (resultadoProjecao)
+
+        todasProjecoes.append(resultadoProjecao)
+
+        if resultadoProjecao["possuiTendencia"]:
+            componentesTendencia.append({
+                chave: valor
+                for chave, valor in resultadoProjecao.items()
+                if chave not in [
+                    "campo",
+                    "valoresProjetados"
+                ]
             })
 
-    tendencias.sort(
-        key=lambda item: item["riscoTendencia"],
+    componentesTendencia.sort(
+        key=lambda componente: (
+            componente["confiabilidadePercentual"],
+            componente["mudancaProjetada"]
+        ),
         reverse=True
     )
 
-    return tendencias
+    quantidadeMantida = max(0,len(janelaAtual) - horizonteColetas)
 
-#def que identifica o motivo da projeção, quais componentes vão resultar naquilo
-def gerarMotivoProjecao(componentesTendencia):
-    if len(componentesTendencia) == 0:
-        return "Sem riscos relevantes"
+    janelaProjetada = [
+        coleta.copy()
+        for coleta in janelaAtual[-quantidadeMantida:]
+    ]
 
-    if len(componentesTendencia) == 1:
-        componente = componentesTendencia[0]
+    ultimaColeta = janelaAtual[-1]
 
-        return (
-            f"{componente['componente']} com aumento de persistência crítica "
-            f"({componente['aumentoPersistencia']} p.p.)"
-        )
+    for indiceProjecao in range(horizonteColetas):
+        coletaProjetada = ultimaColeta.copy()
 
-    componente1 = componentesTendencia[0]
-    componente2 = componentesTendencia[1]
+        for configuracao in configuracoes:
+            campo = configuracao["campo"]
 
-    return (
-        f"{componente1['componente']} e {componente2['componente']} "
-        f"com aumento de persistência crítica"
+            resultado = projecoes[campo]
+
+            if (resultado["possuiTendencia"]and indiceProjecao< len(resultado["valoresProjetados"])):
+                valorFuturo = resultado[
+                    "valoresProjetados"
+                ][indiceProjecao]
+
+            else:
+                valorFuturo = obterValorRecenteConservador(janelaAtual,campo,configuracao["minimo"],configuracao["maximo"])
+
+            coletaProjetada[campo] = valorFuturo
+
+        coletaProjetada["TIPO_REGISTRO"] = "PROJETADO"
+
+        janelaProjetada.append(coletaProjetada)
+
+    horizontes = [
+        item.get("horizonteMinutos", 0)
+        for item in todasProjecoes
+        if item.get("horizonteMinutos", 0) > 0
+    ]
+
+    horizonteMinutos = (
+        median(horizontes)
+        if horizontes
+        else 0
     )
 
-#def que calcula a penalidade da previsão para montarnos o score previsto
-def calcularPenalidadeProjecao(componentesTendencia):
-    penalidade = 0
+    if componentesTendencia:
+        confiabilidades = [
+            componente["confiabilidadePercentual"]
+            for componente in componentesTendencia
+        ]
 
-    for componente in componentesTendencia:
-        risco = componente["riscoTendencia"]
+        confiabilidadeMedia = (sum(confiabilidades)/ len(confiabilidades))
 
-        if risco >= 25:
-            penalidade += 10
-        elif risco >= 15:
-            penalidade += 7
-        elif risco >= 5:
-            penalidade += 4
+        if confiabilidadeMedia >= 80:
+            confiabilidadeGeral = "alta"
+        elif confiabilidadeMedia >= 65:
+            confiabilidadeGeral = "moderada"
+        else:
+            confiabilidadeGeral = "baixa"
 
-    return min(penalidade, 25)
+    else:
+        confiabilidadeGeral = "sem tendência"
+
+    return {
+        "janelaProjetada": janelaProjetada,
+        "componentesTendencia": componentesTendencia,
+        "todasProjecoes": todasProjecoes,
+        "horizonteColetas": horizonteColetas,
+        "horizonteMinutos": round(horizonteMinutos,2),
+        "confiabilidade": confiabilidadeGeral
+    }
+
+# def que indica o  motivo da projeção ter sido calculada daquela forma, qual ou quais componentes que a afetaram mais 
+def gerarMotivoProjecao(componentesTendencia):
+    if not componentesTendencia:
+        return "Sem tendência consistente de degradação"
+
+    principais = componentesTendencia[:2]
+
+    nomes = [
+        componente["componente"]
+        for componente in principais
+    ]
+
+    if len(nomes) == 1:
+        return (
+            f"{nomes[0]} apresenta crescimento "
+            f"consistente no período recente"
+        )
+
+    return (
+        f"{nomes[0]} e {nomes[1]} apresentam "
+        f"crescimento consistente no período recente"
+    )
+
 
 #------------------------------------------------------------------------------------------------------------------------------------------------
 #gerando o uptime de cada servidor
@@ -1106,7 +1099,7 @@ def calcularUptimeServidor(chamadosServidor, servidor, zona, inicioPeriodo, fimP
 
 #alertas semana
 def carregarHistoricoAlertas(bucket):
-   pathHistorico = "trusted/alertas_historico.json"
+   pathHistorico = "da/trustedalertas_historico.json"
 
    try:
         s3 = boto3.client("s3")
@@ -1333,7 +1326,7 @@ def dashOperacional(dados, geral, bucket):
             "empresas": {}
         }
 
-    df["DATE"] = pd.to_datetime(df["DATE"])
+    df["DATE"] = pd.to_datetime(df["DATE"], format='mixed')
 
     historicoAlertas = carregarHistoricoAlertas(bucket)
 
@@ -1431,7 +1424,6 @@ def dashOperacional(dados, geral, bucket):
                             "scoreParcialAtual": resultadoScore["scoreParcialAtual"],
                             "scoreParcialAnterior": resultadoScore["scoreParcialAnterior"],
                             "queda": resultadoScore["queda"],
-                            "penalidadeTendencia": resultadoScore["penalidadeTendencia"],
                             "projecaoSaude": resultadoScore["projecaoSaude"],
                             "uptimeOperacional": resultadoUptime
                         }
@@ -1534,4 +1526,4 @@ def dashOperacional(dados, geral, bucket):
         "tipo": "gestora",
         "total_dados": len(dados),
         "empresas": resultado
-    }
+    }   

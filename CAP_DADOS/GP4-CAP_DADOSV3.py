@@ -33,7 +33,7 @@ print("""\033[33m
 
 \033[m""")
 
-load_dotenv()
+load_dotenv(".env.dev")
 print("=== VERIFICANDO VARIÁVEIS DE AMBIENTE ===")
 print(f"DB_HOST: {os.getenv('DB_HOST')}")
 print(f"DB_USER: {os.getenv('DB_USER')}")
