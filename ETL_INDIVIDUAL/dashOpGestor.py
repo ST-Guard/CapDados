@@ -6,6 +6,7 @@ import pandas as pd
 from urllib.parse import unquote_plus
 from datetime import datetime, timedelta
 from statistics import median
+from zoneinfo import ZoneInfo
 
 s3 = boto3.client('s3')
 
@@ -65,11 +66,64 @@ def ClientGeral(bucket, chave):
 
     geral = carregarMetricasJson(bucket)
 
-    df = pd.read_csv(io.StringIO(conteudo_texto), delimiter=";")
-    dados_dicionario = df.to_dict(orient="records")
+    df = pd.read_csv(
+    io.StringIO(conteudo_texto),
+    delimiter=";"
+    )
 
-    respGestoraOp = dashOperacional(dados_dicionario, geral, bucket)
+    df["DATE"] = pd.to_datetime(df["DATE"],format="mixed",errors="coerce")
 
+    df = df.dropna(subset=["DATE"])
+    df = df.drop_duplicates(
+    subset=[
+        "EMPRESA",
+        "REGIAO",
+        "DATACENTER",
+        "ZONA",
+        "SERVIDOR",
+        "DATE"
+    ],
+    keep="last"
+    )
+
+    agora = obterAgoraSaoPaulo()
+
+    inicioSemanaAtual = (agora - timedelta(days=agora.weekday())).replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0
+    )
+
+    inicioSemanaAnterior = (inicioSemanaAtual - timedelta(days=7))
+
+    dfAlertas = df[(df["DATE"] >= inicioSemanaAnterior)& (df["DATE"] <= agora)].copy()
+
+   
+    colunasAgrupamento = [
+        "EMPRESA",
+        "REGIAO",
+        "DATACENTER",
+        "ZONA",
+        "SERVIDOR"
+    ]
+
+    dfScore = (
+        df.sort_values("DATE").groupby(colunasAgrupamento,group_keys=False).tail(60).copy())
+
+    print(
+        f"Total recebido do trusted: {len(df)}"
+    )
+
+    print(
+        f"Linhas usadas nos alertas: {len(dfAlertas)}"
+    )
+
+    print(
+        f"Linhas usadas no score: {len(dfScore)}"
+    )
+
+    respGestoraOp = dashOperacional(dfScore,dfAlertas,geral,bucket)
     s3.put_object(
         Bucket=bucket,
         Key="client/dashOpGestao.json",
@@ -80,6 +134,7 @@ def ClientGeral(bucket, chave):
     print("Todas as paginas processadas e atualizadas. 🟩")
     return "Lambda concluida com sucesso! ✅"
 
+#------------------------------------------------------------------------------Scores------------------------------------------------------------
 #SCORE SAUDE SERVIDOR
 LIMITE_CPU = 80
 LIMITE_RAM = 85
@@ -851,10 +906,13 @@ def construirJanelaProjetada(janelaAnterior,janelaAtual,limites,horizonteColetas
 
     quantidadeMantida = max(0,len(janelaAtual) - horizonteColetas)
 
-    janelaProjetada = [
-        coleta.copy()
-        for coleta in janelaAtual[-quantidadeMantida:]
-    ]
+    if quantidadeMantida > 0:
+        janelaProjetada = [
+            coleta.copy()
+            for coleta in janelaAtual[-quantidadeMantida:]
+        ]
+    else:
+        janelaProjetada = []
 
     ultimaColeta = janelaAtual[-1]
 
@@ -946,6 +1004,9 @@ def gerarMotivoProjecao(componentesTendencia):
 #------------------------------------------------------------------------------------------------------------------------------------------------
 #gerando o uptime de cada servidor
 
+PERIODO_UPTIME_DIAS = 30
+LIMITE_UPTIME_IDEAL = 99
+
 def classificarStatusUptime(uptime):
     if uptime >= 99:
         return "Saudável"
@@ -955,42 +1016,92 @@ def classificarStatusUptime(uptime):
 
 #df que lê o json de chamados
 def carregarChamadosJson(bucket):
-    try:
-        s3 = boto3.client("s3")
+    caminhoJson = "dados_alertas/ultimos_alertas.json"
 
-        resposta = s3.get_object(
-            Bucket=bucket,
-            Key="dados_alertas/ultimos_alertas.json"
-        )
+    try:
+        resposta = s3.get_object(Bucket=bucket,Key=caminhoJson)
 
         conteudo = resposta["Body"].read().decode("utf-8")
         chamadosJson = json.loads(conteudo)
 
-        print("✅ chamados.json carregado do S3")
+        print(
+            f" ultimos_alertas.json carregado do S3: "
+            f"{caminhoJson}"
+        )
         return chamadosJson
+    except Exception as erro:
+        print(
+            f" Erro ao carregar ultimos_alertas.json: "
+            f"{erro}"
+        )
 
-    except Exception as e:
-        print(f"⚠️ Erro ao carregar chamados.json: {e}")
         return {}
-
+    
 #df que pega os chamadso de cada srv individualmente
-def obterChamadosServidor(chamadosJson, empresa, datacenter, zona, servidor):
+def obterChamadosServidor(chamadosJson,empresa,datacenter,zona,servidor):
     try:
-        dadosServidor = chamadosJson[empresa][datacenter][zona][servidor]
-        return dadosServidor.get("chamados", [])
+        dadosServidor = (
+            chamadosJson[empresa]
+            [datacenter]
+            [zona]
+            [servidor]
+        )
 
-    except (KeyError, TypeError):
+        chamados = dadosServidor.get("chamados", {})
+
+        if isinstance(chamados, dict):
+            return list(chamados.values())
+
+        if isinstance(chamados, list):
+            return chamados
+
         return []
 
+    except (KeyError, TypeError):
+        print(
+            f"Chamados não encontrados para: "
+            f"{empresa}/{datacenter}/{zona}/{servidor}"
+        )
+        return []
 #df filtrando apenas os chamados criticos que afetam a disponibilidade do srv
+def normalizarTexto(valor):
+    if valor is None:
+        return ""
+
+    texto = str(valor).strip().lower()
+
+    substituicoes = {
+        "á": "a",
+        "à": "a",
+        "ã": "a",
+        "â": "a",
+        "é": "e",
+        "ê": "e",
+        "í": "i",
+        "ó": "o",
+        "ô": "o",
+        "õ": "o",
+        "ú": "u",
+        "ç": "c"
+    }
+
+    for caractere, substituto in substituicoes.items():
+        texto = texto.replace(caractere,substituto)
+    return texto
+
+
 def chamadoContaComoIndisponibilidade(chamado):
-    severidade = chamado.get("severidade")
+    if not isinstance(chamado, dict):
+        return False
 
-    if severidade is None or str(severidade).strip() == "":
-        return True
+    severidade = normalizarTexto(
+        chamado.get("severidade")
+    )
 
-    return str(severidade).lower() in ["critico", "crítico"]
+    return severidade == "critico"
 
+
+# def que faz a conversao da data e hora
 def converterData(valor):
     if valor is None:
         return None
@@ -998,186 +1109,538 @@ def converterData(valor):
     if isinstance(valor, datetime):
         return valor.replace(tzinfo=None)
 
-    if isinstance(valor, str):
-        valor = valor.strip()
+    if isinstance(valor, pd.Timestamp):
+        return valor.to_pydatetime().replace(
+            tzinfo=None
+        )
 
-        if valor == "":
-            return None
+    if not isinstance(valor, str):
+        return None
 
+    valor = valor.strip()
+
+    if valor == "":
+        return None
+
+    if valor.lower() in [
+        "none",
+        "null",
+        "em_aberto"
+    ]:
+        return None
+
+    try:
+        data = datetime.fromisoformat(valor)
+
+        if data.tzinfo is not None:
+            data = data.replace(tzinfo=None)
+
+        return data
+
+    except ValueError:
+        pass
+
+    formatosAlternativos = [
+        "%Y-%m-%d %H:%M:%S",
+        "%d/%m/%Y %H:%M",
+        "%d/%m/%Y %H:%M:%S"
+    ]
+
+    for formato in formatosAlternativos:
         try:
-            return datetime.fromisoformat(valor).replace(tzinfo=None)
-        except ValueError:
-            try:
-                return datetime.strptime(valor, "%Y-%m-%d %H:%M:%S").replace(tzinfo=None)
-            except ValueError:
-                print(f"⚠️ Data inválida: {valor}")
-                return None
+            return datetime.strptime(valor,formato)
 
+        except ValueError:
+            continue
+
+    print(f" Data inválida ignorada: {valor}")
     return None
+
+#def que junta o intervalo entre cada chamada aberto
+def unificarIntervalosIndisponibilidade(intervalos):
+    if not intervalos:
+        return []
+
+    intervalosOrdenados = sorted(
+        intervalos,
+        key=lambda intervalo: intervalo[0]
+    )
+
+    intervalosUnificados = [
+        [
+            intervalosOrdenados[0][0],
+            intervalosOrdenados[0][1]
+        ]
+    ]
+
+    for inicioAtual, fimAtual in intervalosOrdenados[1:]:
+        ultimoIntervalo = intervalosUnificados[-1]
+
+        ultimoFim = ultimoIntervalo[1]
+
+        if inicioAtual <= ultimoFim:
+            ultimoIntervalo[1] = max(
+                ultimoFim,
+                fimAtual
+            )
+
+        else:
+            intervalosUnificados.append(
+                [inicioAtual, fimAtual]
+            )
+
+    return [
+        (inicio, fim)
+        for inicio, fim in intervalosUnificados
+    ]
 
 #def que de acordo com os seguntos em que o chamado ficou aberto( rodando a cada 5 minuots para a atualização) considera isso como indisponibilidade e faz o calculo do uptime do servidor
 def calcularUptimeServidor(chamadosServidor, servidor, zona, inicioPeriodo, fimPeriodo):
-    tempoTotalSegundos = (fimPeriodo - inicioPeriodo).total_seconds()
-
-    tempoIndisponivelSegundos = 0
-    qtdChamadosIndisponibilidade = 0
-
-    for chamado in chamadosServidor:
-        if not chamadoContaComoIndisponibilidade(chamado):
-            continue
-
-        duracaoSegundos = chamado.get("duracaoSegundos")
-
-        if duracaoSegundos is not None:
-            try:
-                duracao = float(duracaoSegundos)
-
-                if duracao < 0:
-                    print(f"⚠️ Duração negativa ignorada no servidor {servidor}: {duracao}")
-                    continue
-
-                duracao = min(duracao, tempoTotalSegundos)
-
-                tempoIndisponivelSegundos += duracao
-                qtdChamadosIndisponibilidade += 1
-                continue
-
-            except (ValueError, TypeError):
-                print(f"⚠️ Duração inválida no chamado do servidor {servidor}: {duracaoSegundos}")
-
-        abertura = (
-            chamado.get("abertura")
-            or chamado.get("aberto_em")
-            or chamado.get("inicioIndisponibilidade")
-        )
-
-        abertura = converterData(abertura)
-
-        if abertura is None:
-            continue
-
-        inicioIndisponibilidade = max(abertura, inicioPeriodo)
-        fimIndisponibilidade = fimPeriodo
-
-        if fimIndisponibilidade <= inicioIndisponibilidade:
-            continue
-
-        duracaoCalculada = (fimIndisponibilidade - inicioIndisponibilidade).total_seconds()
-
-        if duracaoCalculada < 0:
-            continue
-
-        duracaoCalculada = min(duracaoCalculada, tempoTotalSegundos)
-
-        tempoIndisponivelSegundos += duracaoCalculada
-        qtdChamadosIndisponibilidade += 1
-
-    tempoIndisponivelSegundos = min(
-        tempoIndisponivelSegundos,
-        tempoTotalSegundos
-    )
+    tempoTotalSegundos = (
+        fimPeriodo - inicioPeriodo
+    ).total_seconds()
 
     if tempoTotalSegundos <= 0:
-        uptime = 100
+        return {
+            "servidor": servidor,
+            "zona": zona,
+            "periodoInicio": inicioPeriodo.isoformat(),
+            "periodoFim": fimPeriodo.isoformat(),
+            "periodoDias": 0,
+            "uptime": 100,
+            "tempoDisponivelSegundos": 0,
+            "tempoIndisponivelSegundos": 0,
+            "tempoIndisponivelMinutos": 0,
+            "tempoIndisponivelHoras": 0,
+            "qtdChamadosCriticos": 0,
+            "qtdPeriodosIndisponibilidade": 0,
+            "qtdChamadosInvalidos": 0,
+            "statusUptime": "Saudável",
+            "possuiChamadosNoPeriodo": False,
+            "descricao": "Período de análise inválido."
+        }
+
+    intervalosIndisponibilidade = []
+
+    qtdChamadosCriticos = 0
+    qtdChamadosInvalidos = 0
+
+    for chamado in chamadosServidor:
+        if not isinstance(chamado, dict):
+            qtdChamadosInvalidos += 1
+            continue
+
+        if not chamadoContaComoIndisponibilidade(
+            chamado
+        ):
+            continue
+
+        abertura = converterData(
+            chamado.get("abertura")
+            or chamado.get("aberto_em")
+            or chamado.get(
+                "inicioIndisponibilidade"
+            )
+        )
+
+        fechamento = converterData(
+            chamado.get("fechamento")
+            or chamado.get("resolvido_em")
+            or chamado.get(
+                "fimIndisponibilidade"
+            )
+        )
+
+        if abertura is None:
+            print(
+                f" Chamado crítico sem abertura válida "
+                f"no servidor {servidor}: "
+                f"{chamado.get('id_alerta')}"
+            )
+
+            qtdChamadosInvalidos += 1
+            continue
+
+        if fechamento is None:
+            fechamento = fimPeriodo
+
+        if fechamento < abertura:
+            print(
+                f"Chamado com fechamento anterior à "
+                f"abertura no servidor {servidor}: "
+                f"{chamado.get('id_alerta')}"
+            )
+
+            qtdChamadosInvalidos += 1
+            continue
+
+        inicioConsiderado = max(abertura,inicioPeriodo)
+        fimConsiderado = min(fechamento,fimPeriodo)
+
+        if fimConsiderado <= inicioConsiderado:
+            continue
+
+        intervalosIndisponibilidade.append((inicioConsiderado,fimConsiderado))
+
+        qtdChamadosCriticos += 1
+
+    intervalosUnificados = (unificarIntervalosIndisponibilidade(intervalosIndisponibilidade))
+
+    tempoIndisponivelSegundos = sum(
+        (
+            fimIntervalo - inicioIntervalo
+        ).total_seconds()
+        for inicioIntervalo, fimIntervalo
+        in intervalosUnificados
+)
+
+    tempoIndisponivelSegundos = max(0,min(tempoIndisponivelSegundos,tempoTotalSegundos))
+
+    tempoDisponivelSegundos = (tempoTotalSegundos- tempoIndisponivelSegundos)
+    uptime = (tempoDisponivelSegundos/ tempoTotalSegundos) * 100
+    uptime = max(0,min(100, uptime))
+    tempoIndisponivelMinutos = (tempoIndisponivelSegundos / 60)
+    tempoIndisponivelHoras = (tempoIndisponivelSegundos / 3600)
+
+    possuiChamadosNoPeriodo = (qtdChamadosCriticos > 0)
+
+    if possuiChamadosNoPeriodo:
+        descricao = (
+            f"{round(tempoIndisponivelHoras, 2)} horas "
+            f"de indisponibilidade registradas nos últimos "
+            f"{PERIODO_UPTIME_DIAS} dias."
+        )
+
     else:
-        uptime = ((tempoTotalSegundos - tempoIndisponivelSegundos) / tempoTotalSegundos) * 100
-
-    uptime = max(0, min(100, uptime))
-
-    tempoIndisponivelHoras = tempoIndisponivelSegundos / 3600
+        descricao = (
+            f"Nenhuma indisponibilidade crítica registrada "
+            f"nos últimos {PERIODO_UPTIME_DIAS} dias."
+        )
 
     return {
         "servidor": servidor,
         "zona": zona,
-        "uptime": round(uptime, 2),
-        "tempoIndisponivelSegundos": round(tempoIndisponivelSegundos, 2),
-        "tempoIndisponivelHoras": round(tempoIndisponivelHoras, 2),
-        "qtdChamadosIndisponibilidade": qtdChamadosIndisponibilidade,
-        "statusUptime": classificarStatusUptime(uptime)
+        "periodoInicio": inicioPeriodo.isoformat(),
+        "periodoFim": fimPeriodo.isoformat(),
+        "periodoDias": PERIODO_UPTIME_DIAS,
+        "uptime": round(uptime, 4),
+        "tempoDisponivelSegundos": round(tempoDisponivelSegundos,2),
+        "tempoIndisponivelSegundos": round(tempoIndisponivelSegundos,2),
+        "tempoIndisponivelMinutos": round(tempoIndisponivelMinutos,2),
+        "tempoIndisponivelHoras": round(tempoIndisponivelHoras,2),
+        "qtdChamadosCriticos": qtdChamadosCriticos,
+        "qtdPeriodosIndisponibilidade": len(intervalosUnificados),
+        "qtdChamadosInvalidos": qtdChamadosInvalidos,
+        "statusUptime": classificarStatusUptime(uptime),
+        "possuiChamadosNoPeriodo": possuiChamadosNoPeriodo,
+        "descricao": descricao
     }
-#------------------------------------------------------------------------------------------------------------------------------------------------
 
-#alertas semana
-def carregarHistoricoAlertas(bucket):
-   pathHistorico = "da/trustedalertas_historico.json"
+#------------------------------------------------------------------ Grafico de alertaas -----------------------------------------------------------------------
+FUSO_HORARIO = ZoneInfo("America/Sao_Paulo")
 
-   try:
-        s3 = boto3.client("s3")
+DIAS_SEMANA = [
+    "Segunda",
+    "Terça",
+    "Quarta",
+    "Quinta",
+    "Sexta",
+    "Sábado",
+    "Domingo"
+]
 
-        resp_hist = s3.get_object(
-            Bucket=bucket,
-            Key=pathHistorico
+
+def obterAgoraSaoPaulo():
+    return datetime.now(FUSO_HORARIO).replace(tzinfo=None)
+
+
+def classificarSeveridadeAlerta(valor, limite):
+    valor = converter_float(valor, None)
+    limite = converter_float(limite, None)
+
+    if valor is None or limite is None:
+        return None
+
+    if limite <= 0:
+        return None
+
+    if valor <= limite:
+        return None
+
+    percentualExcesso = (
+        (valor - limite)
+        / limite
+    ) * 100
+
+    if percentualExcesso <= 10:
+        severidade = "baixo"
+
+    elif percentualExcesso < 30:
+        severidade = "medio"
+
+    else:
+        severidade = "critico"
+
+    return {
+        "severidade": severidade,
+        "percentualExcesso": round(
+            percentualExcesso,
+            2
         )
+    }
 
-        historicoAlertas = json.loads(
-            resp_hist["Body"].read().decode("utf-8")
-        )
 
-        print(f"✅ Histórico carregado: {len(historicoAlertas)} alertas")
-        return historicoAlertas
-   
-   except Exception as e:
-        print(f"⚠️ Histórico não encontrado: {e}")
+
+
+def gerarHistoricoAlertasComponentes(dataframe,metricasJson):
+    if dataframe is None or dataframe.empty:
         return []
 
-#def que calcula a quantidade de alertas em cada dia da semana
-def calcularAlertaSemana( historicoAlertas, empresa,datacenter):
+    dfAlertas = dataframe.copy()
 
-    diasSemana = {
-        0: "Segunda",
-        1: "Terça",
-        2: "Quarta",
-        3: "Quinta",
-        4: "Sexta",
-        5: "Sábado",
-        6: "Domingo"
+    dfAlertas["DATE"] = pd.to_datetime(
+        dfAlertas["DATE"],
+        errors="coerce"
+    )
+
+    dfAlertas = dfAlertas.dropna(
+        subset=["DATE"]
+    )
+
+
+    colunasDuplicidade = [
+        "EMPRESA",
+        "DATACENTER",
+        "ZONA",
+        "SERVIDOR",
+        "DATE"
+    ]
+
+    colunasExistentes = [
+        coluna
+        for coluna in colunasDuplicidade
+        if coluna in dfAlertas.columns
+    ]
+
+    if colunasExistentes:
+        dfAlertas = dfAlertas.drop_duplicates(
+            subset=colunasExistentes
+        )
+
+    agora = obterAgoraSaoPaulo()
+
+    inicioSemanaAtual = (agora- timedelta(days=agora.weekday())).replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0
+    )
+
+    inicioSemanaAnterior = (inicioSemanaAtual- timedelta(days=7))
+
+    dfAlertas = dfAlertas[
+        dfAlertas["DATE"]
+        >= inicioSemanaAnterior
+    ]
+
+    historicoAlertas = []
+
+    for coleta in dfAlertas.to_dict(orient="records"):
+        empresa = coleta.get("EMPRESA")
+        datacenter = coleta.get("DATACENTER")
+        zona = coleta.get("ZONA")
+        servidor = coleta.get("SERVIDOR")
+        dataHora = coleta.get("DATE")
+
+        if (empresa is None or datacenter is None or zona is None or servidor is None or pd.isna(dataHora)):
+            continue
+
+        try:
+            infoServidor = (
+                metricasJson[empresa]
+                [datacenter]
+                [zona]
+                [servidor]
+            )
+
+            limites = infoServidor.get(
+                "limites",
+                {}
+            )
+
+        except (KeyError, TypeError):
+            print(
+                f"Limites não encontrados para alertas: "
+                f"{empresa}/{datacenter}/{zona}/{servidor}"
+            )
+            continue
+
+        componentes = obterConfigComponentes(limites)
+
+        for componente in componentes:
+            nomeComponente = componente["nome"]
+            campo = componente["campo"]
+            limite = componente["limite"]
+
+            valor = converter_float(
+                coleta.get(campo),
+                None
+            )
+
+            resultadoSeveridade = classificarSeveridadeAlerta(
+                valor,
+                limite
+            )
+
+            if resultadoSeveridade is None:
+                continue
+
+            historicoAlertas.append({
+                "empresa": empresa,
+                "datacenter": datacenter,
+                "zona": zona,
+                "servidor": servidor,
+                "componente": nomeComponente,
+                "campo": campo,
+                "valor": round(valor, 2),
+                "limite": round(limite, 2),
+                "percentualExcesso": resultadoSeveridade[
+                    "percentualExcesso"
+                ],
+                "severidade": resultadoSeveridade[
+                    "severidade"
+                ],
+                "timestamp": dataHora.isoformat()
+            })
+
+    print(
+        f"Alertas calculados a partir das coletas: "
+        f"{len(historicoAlertas)}"
+    )
+
+    return historicoAlertas
+
+
+def criarEstruturaDiaAlertas():
+    return {
+        "baixo": 0,
+        "medio": 0,
+        "critico": 0,
+        "total": 0
     }
+
+
+def calcularAlertaSemana(historicoAlertas,empresa,datacenter):
+    agora = obterAgoraSaoPaulo()
+
+    inicioSemana = (agora- timedelta(days=agora.weekday())).replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0
+    )
+
+    fimSemana = (inicioSemana+ timedelta(days=7))
 
     alertasPorDia = {
-        "Segunda": 0,
-        "Terça": 0,
-        "Quarta": 0,
-        "Quinta": 0,
-        "Sexta": 0,
-        "Sábado": 0,
-        "Domingo": 0
+        dia: criarEstruturaDiaAlertas()
+        for dia in DIAS_SEMANA
     }
 
-    agora = datetime.now()
-    inicioSemana = (agora - timedelta(days=agora.weekday())).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
-    fimSemana = inicioSemana + timedelta(days=7)
+    totaisSemana = criarEstruturaDiaAlertas()
 
     for alerta in historicoAlertas:
-        if (
-            str(alerta.get("empresa", "")) != str(empresa)
-            or str(alerta.get("datacenter", "")) != str(datacenter)
-        ):
+        if (str(alerta.get("empresa", ""))!= str(empresa)):
             continue
 
-        ts = str(alerta.get("timestamp", ""))
-        try:
-            dataAlerta = datetime.fromisoformat(ts).replace(tzinfo=None)
-        except:
+        if (str(alerta.get("datacenter", ""))!= str(datacenter)):
             continue
 
-        if dataAlerta < inicioSemana:
+        dataAlerta = converterData(alerta.get("timestamp"))
+
+        if dataAlerta is None:
             continue
 
-        if dataAlerta >= fimSemana:
+        if not (inicioSemana<= dataAlerta< fimSemana):
             continue
 
-        nomeDia = diasSemana[dataAlerta.weekday()]
-        alertasPorDia[nomeDia] += 1
+        severidade = normalizarTexto(
+            alerta.get("severidade")
+        )
 
-    totalAlertas = sum(alertasPorDia.values())
+        if severidade not in ["baixo","medio","critico"]:
+            continue
 
-    mediaAlertas = round(totalAlertas / 7, 2)
+        nomeDia = DIAS_SEMANA[
+            dataAlerta.weekday()
+        ]
 
-    alertasPorDia["media"] = mediaAlertas
+        alertasPorDia[nomeDia][
+            severidade
+        ] += 1
 
-    return alertasPorDia
+        alertasPorDia[nomeDia][
+            "total"
+        ] += 1
+
+        totaisSemana[severidade] += 1
+        totaisSemana["total"] += 1
+
+    totaisPorDia = {
+        dia: dados["total"]
+        for dia, dados in alertasPorDia.items()
+    }
+
+    return {
+        "periodoInicio": inicioSemana.isoformat(),
+        "periodoFim": fimSemana.isoformat(),
+        "totaisPorDia": totaisPorDia,
+        "porSeveridade": alertasPorDia,
+        "totaisSemana": totaisSemana
+    }
+
+
+def calcularVariacaoAlertas(quantidadeAtual,quantidadeAnterior):
+    if quantidadeAnterior == 0:
+        if quantidadeAtual > 0:
+            return {
+                "percentual": None,
+                "valorFormatado": "Novo",
+                "tendencia": "aumento"
+            }
+
+        return {
+            "percentual": 0,
+            "valorFormatado": "0%",
+            "tendencia": "estável"
+        }
+
+    percentual = ((quantidadeAtual - quantidadeAnterior)/ quantidadeAnterior) * 100
+
+    if percentual > 0:
+        tendencia = "aumento"
+        valorFormatado = (
+            f"+{round(percentual, 2)}%"
+        )
+
+    elif percentual < 0:
+        tendencia = "queda"
+        valorFormatado = (
+            f"{round(percentual, 2)}%"
+        )
+
+    else:
+        tendencia = "estável"
+        valorFormatado = "0%"
+
+    return {
+        "percentual": round(percentual,2),
+        "valorFormatado": valorFormatado,
+        "tendencia": tendencia
+    }
+
+
+
 #------------------------------------------------------------------------------------------------------------------------------------------------
 #Montando kpis!
 #kpi de srv saude critica X total srv
@@ -1208,16 +1671,23 @@ def calcularKpiServidoresCriticos(servidores_datacenter):
     }
 
 #kpi de percentual de crescimento dos incidentes
-def calcularCrescimentoIncidentes(historicoAlertas, empresa, datacenter):
-    agora = datetime.now()
+def calcularCrescimentoAlertas(
+    historicoAlertas,
+    empresa,
+    datacenter
+):
+    agora = obterAgoraSaoPaulo()
 
     inicioSemanaAtual = (agora - timedelta(days=agora.weekday())).replace(
-        hour=0, minute=0, second=0, microsecond=0
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0
     )
-    fimSemanaAtual = inicioSemanaAtual + timedelta(days=7)
 
-    inicioSemanaAnterior = inicioSemanaAtual - timedelta(days=7)
-    fimSemanaAnterior = inicioSemanaAtual
+    tempoDecorridoSemana = (agora - inicioSemanaAtual)
+    inicioSemanaAnterior = (inicioSemanaAtual - timedelta(days=7))
+    fimPeriodoSemanaAnterior = (inicioSemanaAnterior+ tempoDecorridoSemana )
 
     alertasSemanaAtual = 0
     alertasSemanaAnterior = 0
@@ -1229,16 +1699,21 @@ def calcularCrescimentoIncidentes(historicoAlertas, empresa, datacenter):
         ):
             continue
 
-        ts = str(alerta.get("timestamp", ""))
+        dataAlerta = converterData(
+            alerta.get("timestamp")
+        )
 
-        try:
-            dataAlerta = datetime.fromisoformat(ts).replace(tzinfo=None)
-        except Exception:
+        if dataAlerta is None:
             continue
 
-        if inicioSemanaAtual <= dataAlerta < fimSemanaAtual:
+        if inicioSemanaAtual <= dataAlerta <= agora:
             alertasSemanaAtual += 1
-        elif inicioSemanaAnterior <= dataAlerta < fimSemanaAnterior:
+
+        elif (
+            inicioSemanaAnterior
+            <= dataAlerta
+            <= fimPeriodoSemanaAnterior
+        ):
             alertasSemanaAnterior += 1
 
     if alertasSemanaAnterior == 0:
@@ -1252,22 +1727,28 @@ def calcularCrescimentoIncidentes(historicoAlertas, empresa, datacenter):
             tendencia = "estável"
     else:
         crescimentoPercentual = (
-            (alertasSemanaAtual - alertasSemanaAnterior)
-            / alertasSemanaAnterior
-        ) * 100
+            (
+                alertasSemanaAtual- alertasSemanaAnterior)/ alertasSemanaAnterior) * 100
 
         if crescimentoPercentual > 0:
-            valorFormatado = f"+{round(crescimentoPercentual, 2)}%"
+            valorFormatado = (
+                f"+{round(crescimentoPercentual, 2)}%"
+            )
             tendencia = "aumento"
+
         elif crescimentoPercentual < 0:
-            valorFormatado = f"{round(crescimentoPercentual, 2)}%"
+            valorFormatado = (
+                f"{round(crescimentoPercentual, 2)}%"
+            )
             tendencia = "queda"
+
         else:
             valorFormatado = "0%"
             tendencia = "estável"
 
     percentualRetorno = (
-        None if crescimentoPercentual is None
+        None
+        if crescimentoPercentual is None
         else round(crescimentoPercentual, 2)
     )
 
@@ -1276,62 +1757,97 @@ def calcularCrescimentoIncidentes(historicoAlertas, empresa, datacenter):
         "valorFormatado": valorFormatado,
         "alertasSemanaAtual": alertasSemanaAtual,
         "alertasSemanaAnterior": alertasSemanaAnterior,
-        "descricao": f"De {alertasSemanaAnterior} alertas na semana anterior para {alertasSemanaAtual} alertas na semana atual",
-        "tendencia": tendencia
+        "descricao": (
+            f"De {alertasSemanaAnterior} alertas "
+            f"no mesmo período da semana anterior para "
+            f"{alertasSemanaAtual} alertas na semana atual."
+        ),
+        "tendencia": tendencia,
+        "periodoAtual": {
+            "inicio": inicioSemanaAtual.isoformat(),
+            "fim": agora.isoformat()
+        },
+        "periodoAnteriorComparado": {
+            "inicio": inicioSemanaAnterior.isoformat(),
+            "fim": fimPeriodoSemanaAnterior.isoformat()
+        }
     }
 
 
 #kpi do uptime
-def calcularKpiUptime(uptimeServidores, limiteUptimeIdeal=99):
+def calcularKpiUptime(uptimeServidores, limiteUptimeIdeal=LIMITE_UPTIME_IDEAL):
     totalServidores = len(uptimeServidores)
 
     if totalServidores == 0:
         return {
-            "qtdServidoresInstaveis": 0,
+            "servidoresAbaixoIdeal": 0,
             "totalServidores": 0,
-            "percentualInstaveis": 0,
+            "percentualAbaixoIdeal": 0,
             "limiteIdeal": limiteUptimeIdeal,
+            "periodoDias": PERIODO_UPTIME_DIAS,
             "valorFormatado": "0/0",
             "descricao": "Nenhum servidor encontrado."
         }
 
-    qtdServidoresInstaveis = 0
+    servidoresAbaixoIdeal = 0
+    servidoresSemIndisponibilidadeRegistrada = 0
 
     for servidor in uptimeServidores:
-        if servidor["uptime"] < limiteUptimeIdeal:
-            qtdServidoresInstaveis += 1
+        uptime = converter_float(
+            servidor.get("uptime"),
+            100
+        )
 
-    percentualInstaveis = (qtdServidoresInstaveis / totalServidores) * 100
+        if uptime < limiteUptimeIdeal:
+            servidoresAbaixoIdeal += 1
+
+        if not servidor.get(
+            "possuiChamadosNoPeriodo",
+            False
+        ):
+            servidoresSemIndisponibilidadeRegistrada += 1
+
+    percentualAbaixoIdeal = (servidoresAbaixoIdeal/ totalServidores) * 100
 
     return {
-        "qtdServidoresInstaveis": qtdServidoresInstaveis,
+        "servidoresAbaixoIdeal": servidoresAbaixoIdeal,
         "totalServidores": totalServidores,
-        "percentualInstaveis": round(percentualInstaveis, 2),
+        "percentualAbaixoIdeal": round(percentualAbaixoIdeal,2),
+        "servidoresSemIndisponibilidadeRegistrada": (servidoresSemIndisponibilidadeRegistrada),
         "limiteIdeal": limiteUptimeIdeal,
-        "valorFormatado": f"{qtdServidoresInstaveis}/{totalServidores}",
-        "descricao": f"{round(percentualInstaveis, 2)}% dos servidores estão com o uptime abaixo do ideal."
+        "periodoDias": PERIODO_UPTIME_DIAS,
+        "valorFormatado": (
+            f"{servidoresAbaixoIdeal}/"
+            f"{totalServidores}"
+        ),
+        "descricao": (
+            f"{servidoresAbaixoIdeal} de "
+            f"{totalServidores} servidores ficaram "
+            f"abaixo de {limiteUptimeIdeal}% de uptime "
+            f"nos últimos {PERIODO_UPTIME_DIAS} dias."
+        )
     }
+
 #---------------------------------------------------------------------------------------------------------------------------------
+def dashOperacional( dfScore,dfAlertas, geral, bucket):
+    print("\n ENTREI NA DASH OPERACIONAL")
 
-def dashOperacional(dados, geral, bucket):
-    print("\n🚀 ENTREI NA DASH OPERACIONAL")
-
-    df = pd.DataFrame(dados)
+    df = dfScore.copy()
 
     if df.empty:
-        print("⚠️ DataFrame vazio")
+        print(" DataFrame vazio")
         return {
             "tipo": "gestora",
             "total_dados": 0,
             "empresas": {}
         }
 
-    df["DATE"] = pd.to_datetime(df["DATE"], format='mixed')
+    df["DATE"] = pd.to_datetime(df["DATE"],format="mixed",errors="coerce")
+    df = df.dropna(subset=["DATE"])
 
-    historicoAlertas = carregarHistoricoAlertas(bucket)
-
+    historicoAlertas = gerarHistoricoAlertasComponentes(dfAlertas,geral)
     fimPeriodoUptime = datetime.now()
-    inicioPeriodoUptime = fimPeriodoUptime - timedelta(days=7)
+    inicioPeriodoUptime =   (fimPeriodoUptime- timedelta(days=PERIODO_UPTIME_DIAS))
 
     chamadosJson = carregarChamadosJson(bucket)
 
@@ -1339,7 +1855,7 @@ def dashOperacional(dados, geral, bucket):
 
     for empresa, df_empresa in df.groupby("EMPRESA"):
 
-        print(f"\n🏢 EMPRESA: {empresa}")
+        print(f"\nEMPRESA: {empresa}")
 
         resultado.setdefault(empresa, {
             "regioes": {},
@@ -1348,13 +1864,13 @@ def dashOperacional(dados, geral, bucket):
 
         for regiao, df_regiao in df_empresa.groupby("REGIAO"):
 
-            print(f"\n🌎 REGIÃO: {regiao}")
+            print(f"\n REGIÃO: {regiao}")
 
             datacentersRegiao = []
 
             for datacenter, df_dc in df_regiao.groupby("DATACENTER"):
 
-                print(f"\n🏢 DATACENTER: {datacenter}")
+                print(f"\n DATACENTER: {datacenter}")
 
                 graficoAlertasSemana = calcularAlertaSemana(
                     historicoAlertas,
@@ -1368,23 +1884,23 @@ def dashOperacional(dados, geral, bucket):
 
                 for zona, df_zona in df_dc.groupby("ZONA"):
 
-                    print(f"\n📍 ZONA: {zona}")
+                    print(f"\n ZONA: {zona}")
 
                     servidoresZona = []
 
                     for servidor, df_servidor in df_zona.groupby("SERVIDOR"):
 
-                        print(f"\n🖥️ SERVIDOR: {servidor}")
+                        print(f"\n SERVIDOR: {servidor}")
 
                         try:
                             info_servidor = geral[empresa][datacenter][zona][servidor]
                             limites = info_servidor.get("limites", {})
 
-                            print("✅ Limites encontrados:", limites)
+                            print(" Limites encontrados:", limites)
 
                         except (KeyError, TypeError):
                             limites = {}
-                            print("⚠️ Limites não encontrados. Usando fallback.")
+                            print(" Limites não encontrados. Usando fallback.")
 
                         chamadosServidor = obterChamadosServidor(
                             chamadosJson,
@@ -1394,27 +1910,21 @@ def dashOperacional(dados, geral, bucket):
                             servidor
                         )
 
-                        resultadoUptime = calcularUptimeServidor(
-                            chamadosServidor,
-                            servidor,
-                            zona,
-                            inicioPeriodoUptime,
-                            fimPeriodoUptime
-                        )
+                        resultadoUptime = calcularUptimeServidor(chamadosServidor, servidor,zona,inicioPeriodoUptime,fimPeriodoUptime)
 
                         uptimeServidores.append(resultadoUptime)
 
                         df_servidor = df_servidor.sort_values("DATE")
                         coletaServidor = df_servidor.to_dict(orient="records")
 
-                        print(f"📦 Quantidade de coletas: {len(coletaServidor)}")
+                        print(f" Quantidade de coletas: {len(coletaServidor)}")
 
                         resultadoScore = calcularScoreServidor(
                             coletaServidor,
                             limites
                         )
 
-                        print("📊 SCORE SERVIDOR:", resultadoScore)
+                        print(" SCORE SERVIDOR:", resultadoScore)
 
                         servidor_obj = {
                             "servidor": servidor,
@@ -1433,7 +1943,7 @@ def dashOperacional(dados, geral, bucket):
 
                     resultadoZona = calcularScoreZona(servidoresZona)
 
-                    print("📊 SCORE ZONA:", resultadoZona)
+                    print(" SCORE ZONA:", resultadoZona)
 
                     zona_obj = {
                         "zona": zona,
@@ -1448,18 +1958,27 @@ def dashOperacional(dados, geral, bucket):
 
                     zonas.append(zona_obj)
 
-                    print(f"✅ JSON da zona {zona} criado")
+                    print(f" JSON da zona {zona} criado")
 
                 resultadoDatacenter = calcularScoreDatacenter(zonas)
 
-                print("📊 SCORE DATACENTER:", resultadoDatacenter)
+                print("SCORE DATACENTER:", resultadoDatacenter)
 
                 rankingSrvCriticosTop5 = sorted(
                     servidores_datacenter,
                     key=lambda servidor: servidor["score"]
                 )[:5]
 
-                kpiCrescimentoIncidentes = calcularCrescimentoIncidentes(
+                rankingTendenciaServidores = sorted(
+                    servidores_datacenter,
+                    key=lambda servidor: (
+                        servidor.get("projecaoSaude", {}).get("scoreProjetado",servidor.get("score", 100)),
+                        -servidor.get("projecaoSaude", {}).get("degradacaoProjetada",0),
+                        servidor.get("score", 100)
+                    )
+                    )
+
+                kpiCrescimentoAlertas = calcularCrescimentoAlertas(
                     historicoAlertas,
                     empresa,
                     datacenter
@@ -1481,10 +2000,11 @@ def dashOperacional(dados, geral, bucket):
                     "zonaPiorScore": resultadoDatacenter["zonaPiorScore"],
                     "zonas": zonas,
                     "rankingSrvCriticosTop5": rankingSrvCriticosTop5,
+                    "rankingTendenciaServidores": rankingTendenciaServidores,
                     "graficoAlertasSemana": graficoAlertasSemana,
                     "uptimeServidores": uptimeServidores,
                     "kpiUptime": kpiUptime,
-                    "kpiCrescimentoIncidentes": kpiCrescimentoIncidentes,
+                    "kpiCrescimentoAlertas": kpiCrescimentoAlertas,
                     "kpiServidoresCriticos": kpiServidoresCriticos
                 }
 
@@ -1502,11 +2022,11 @@ def dashOperacional(dados, geral, bucket):
 
                 datacentersRegiao.append(datacenter_obj_regiao)
 
-                print(f"✅ JSON FINAL DO DATACENTER {datacenter} CRIADO")
+                print(f"JSON FINAL DO DATACENTER {datacenter} CRIADO")
 
             resultadoRegiao = calcularScoreRegiao(datacentersRegiao)
 
-            print("📊 SCORE REGIÃO:", resultadoRegiao)
+            print(" SCORE REGIÃO:", resultadoRegiao)
 
             resultado[empresa]["regioes"][regiao] = {
                 "score": resultadoRegiao["score"],
@@ -1518,12 +2038,13 @@ def dashOperacional(dados, geral, bucket):
                 "datacenters": datacentersRegiao
             }
 
-            print(f"✅ JSON FINAL DA REGIÃO {regiao} CRIADO")
+            print(f" JSON FINAL DA REGIÃO {regiao} CRIADO")
 
-    print("\n🎉 DASH OPERACIONAL FINALIZADA")
+    print("\n DASH OPERACIONAL FINALIZADA")
 
     return {
         "tipo": "gestora",
-        "total_dados": len(dados),
+        "total_dados_score": len(dfScore),
+        "total_dados_alertas": len(dfAlertas),
         "empresas": resultado
     }   
