@@ -16,10 +16,10 @@ import random
 
 
 arquivo_csv = "dados-brutos_maquina.csv"
-bucket_name = 'smartdatabucket2'
+bucket_name = 'smartdatabucket-17-04'
 
 #STE12345
-#SRV-DC01-WEB-05
+#SERVIDOR-SP-01
 
 print("""\033[33m
   /$$$$$$                                      /$$     /$$$$$$$              /$$              
@@ -376,7 +376,7 @@ def capturaCSV(servidor):
 
         # API Steam 
         jogadores_globais  = buscarJogadoresAtivos()
-        jogadores_nossos = round((jogadores_globais * 0.3) / TOTAL_SERVIDORES_STEAM, 2)
+        jogadores_nossos = jogadores_globais * 0.4 # pegando a quantidade de jogadores brasileiros
 
 
 
@@ -502,7 +502,7 @@ def capturaJson():
             r.estado,
             r.cep,
             r.numero,
-            r.complemento,
+            r.estado,
             d.idDataCenter,
             d.nome AS datacenter,
             d.capacidadeServidores,
@@ -563,7 +563,7 @@ def capturaJson():
     for linha in geral:
         empresa = linha["empresa"]
         datacenter = linha["datacenter"]
-        zona = linha["zona"]
+        zona = linha["zona"].replace(" ", "")
         servidor = linha["servidor"]
         componente = linha["componente"]
 
@@ -622,7 +622,7 @@ def capturaJson():
 
 
 
-    # pegando os dados das empresas
+     # pegando os dados das empresas
 
     cursor = conexao_json.cursor()
 
@@ -674,7 +674,7 @@ def capturaJson():
 
             for zona in zonas:
                         id_zona = zona[0]
-                        nome_zona = zona[1]
+                        nome_zona = zona[1].replace(" ", "")
 
                   
 
@@ -693,14 +693,36 @@ def capturaJson():
 
                         
 
-                        query_mttr_zona = f"""
-SELECT z.nome, AVG(mttr_minutos) FROM zona z 
-JOIN servidor ON fkZona = z.idZona 
-JOIN registros_alertas ON fkRegistroServidor = idServidor WHERE z.idZona = {id_zona} GROUP BY z.nome;
+                        query_mttr_zona = f"""  
+        SELECT z.nome, AVG(mttr_minutos) FROM zona z 
+        JOIN servidor ON fkZona = z.idZona 
+        JOIN registros_alertas ON fkRegistroServidor = idServidor WHERE z.idZona = {id_zona} GROUP BY z.nome;
 
-"""
+        """
                         cursor.execute(query_mttr_zona)
                         mttr = cursor.fetchall()
+
+
+
+
+                        query_qtd_servidores = f"""
+            SELECT z.nome, count(z.idZona) as "Quantidade de servidores" FROM zona z 
+                        JOIN servidor ON fkZona = z.idZona 
+                          WHERE z.idZona = {id_zona} GROUP BY z.nome;
+        """
+                        
+                        cursor.execute(query_qtd_servidores)
+                        qtd_servidores = cursor.fetchall()
+
+
+                        
+
+                        qtd_servidores = qtd_servidores[0][1]
+
+
+                        
+
+
 
                         quantidade_alerta = 0
                         if len(quantidade_aberto) == 0:
@@ -721,7 +743,8 @@ JOIN registros_alertas ON fkRegistroServidor = idServidor WHERE z.idZona = {id_z
 
                         dados_alertas[nome_empresa][nome_datacenter][nome_zona] = {
                             "QUANTIDADE_ABERTO": quantidade_alerta,
-                            "MTTR_ZONA": mttr_m
+                            "MTTR_ZONA": mttr_m,
+                            "QTD_SERVIDORES": qtd_servidores
 
                         }
 
@@ -822,6 +845,7 @@ if servidor:
         if (cont == 30 or cont == -1):
             cont = 0
             capturaJson()
+
         cont += 1
 else:
     print("Erro na validação")

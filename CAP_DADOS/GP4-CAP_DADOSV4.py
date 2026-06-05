@@ -16,7 +16,7 @@ import random
 
 
 arquivo_csv = "dados-brutos_maquina.csv"
-bucket_name = 'smartdatabucket2'
+bucket_name = 'smartdatabucket-17-04'
 
 #STE12345
 #SRV-DC01-WEB-05
@@ -499,7 +499,7 @@ def capturaJson():
     )
     cursor = conexao_json.cursor(dictionary=True)
     query = """
-        SELECT
+                        SELECT
             e.idEmpresa,
             e.razaoSocial AS empresa,
             r.idRegiao,
@@ -558,6 +558,7 @@ def capturaJson():
             z.idZona,
             s.idServidor,
             c.idComponente;
+    
         """
 
     cursor.execute(query)
@@ -706,6 +707,28 @@ JOIN registros_alertas ON fkRegistroServidor = idServidor WHERE z.idZona = {id_z
                         cursor.execute(query_mttr_zona)
                         mttr = cursor.fetchall()
 
+
+
+
+                        query_qtd_servidores = f"""
+            SELECT z.nome, count(z.idZona) as "Quantidade de servidores" FROM zona z 
+                        JOIN servidor ON fkZona = z.idZona 
+                          WHERE z.idZona = {id_zona} GROUP BY z.nome;
+"""
+                        
+                        cursor.execute(query_qtd_servidores)
+                        qtd_servidores = cursor.fetchall()
+
+
+                        
+
+                        qtd_servidores = qtd_servidores[0][1]
+
+
+                        
+
+
+
                         quantidade_alerta = 0
                         if len(quantidade_aberto) == 0:
                             quantidade_alerta = 0
@@ -725,7 +748,8 @@ JOIN registros_alertas ON fkRegistroServidor = idServidor WHERE z.idZona = {id_z
 
                         dados_alertas[nome_empresa][nome_datacenter][nome_zona] = {
                             "QUANTIDADE_ABERTO": quantidade_alerta,
-                            "MTTR_ZONA": mttr_m
+                            "MTTR_ZONA": mttr_m,
+                            "QTD_SERVIDORES": qtd_servidores
 
                         }
 
@@ -830,14 +854,14 @@ if servidor:
     while True:
         cont_linhas_csv += 1
 
-        deve_enviar_csv = cont_linhas_csv >= 30
+        deve_enviar_csv = cont_linhas_csv >= 2
 
         capturaCSV(servidor, deve_enviar_csv)
 
         if deve_enviar_csv:
             cont_linhas_csv = 0
 
-        time.sleep(10)
+        time.sleep(2)
 
         if cont_json == 30 or cont_json == -1:
             cont_json = 0

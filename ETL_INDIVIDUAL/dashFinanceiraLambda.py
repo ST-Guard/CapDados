@@ -11,11 +11,21 @@ s3 = boto3.client('s3')
 def lambda_handler(event, context):
     print("Lambda dashboard financiera Iniciada! 💵")
     try:
-        registro = event["Records"][0]["s3"]
+        mensagem_sns_texto = event["Records"][0]["Sns"]["Message"]
+        evento_s3_real = json.loads(mensagem_sns_texto)
+        
+        if "Evento" in evento_s3_real and evento_s3_real["Evento"] == "s3:TestEvent":
+            print("Evento de teste do S3 recebido e ignorado com sucesso! ✅")
+            return {"statusCode": 200, "body": "TestEvent ignorado"}
+            
+   
+        registro = evento_s3_real["Records"][0]["s3"]
         key = unquote_plus(registro["object"]["key"])
         bucket = registro["bucket"]["name"]
+        
         if key.lower().endswith(".json"):
             return {"statusCode": 200, "body": f"Arquivo JSON ignorado: {key}"}
+            
         if key != "trusted/dados_tratados.csv":
             print(f"Ignorando arquivo que não é o trusted principal: {key}")
             return {"statusCode": 200, "body": f"Arquivo ignorado: {key}"}
@@ -109,9 +119,13 @@ def calcularMAE(x, y, modelo):
 
 def dashFinanceiro(event, context):
     # Extrair informações do S3
-    registro = event["Records"][0]["s3"]
-    bucket = registro["bucket"]["name"]
+    mensagem_sns_texto = event["Records"][0]["Sns"]["Message"]
+    evento_s3_real = json.loads(mensagem_sns_texto)
+    registro = evento_s3_real["Records"][0]["s3"]
+
+
     key = unquote_plus(registro["object"]["key"])
+    bucket = registro["bucket"]["name"]
     
     print(f"Baixando dados tratados de: {key}")
     
@@ -228,18 +242,18 @@ def dashFinanceiro(event, context):
 
         #CUSTO VARIAVEL 
     #ENERGIA
-    POTENCIA_MIN_W = 6000
-    POTENCIA_MAX_W = 18000
-    TARIFA_KWH = 2.20
+    POTENCIA_MIN_W = 1800
+    POTENCIA_MAX_W = 9000
+    TARIFA_KWH = 1.20
     MARGEM_ORCAMENTO = 0.05 
-    CUSTO_OPERACIONAL_POR_JOGADOR_5MIN = 0.006
+    CUSTO_OPERACIONAL_POR_JOGADOR_5MIN = 0.024
 
     fator_carga = (cpu * PESO_CPU_ENERGIA) + (ram * PESO_RAM_ENERGIA) + (disco * PESO_DISCO_ENERGIA)
     potencia_w = POTENCIA_MIN_W + (POTENCIA_MAX_W - POTENCIA_MIN_W) * fator_carga
     energia_kwh = (potencia_w / 1000) * 5 / 60
     
     #REDE
-    CUSTO_BANDA_POR_PACOTE = 0.0035
+    CUSTO_BANDA_POR_PACOTE = 0.0065
     custo_rede = (df['PACOTES_ENV_DELTA'] + df['PACOTES_RCB_DELTA']) * CUSTO_BANDA_POR_PACOTE
     custo_jogadores = df['JOGADORES_ATIVOS_AJUSTADO'] * CUSTO_OPERACIONAL_POR_JOGADOR_5MIN
     
@@ -265,8 +279,8 @@ def dashFinanceiro(event, context):
     # ── FINALIZNADO CUSTO ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
         #CUSTO FIXO
-    CUSTO_GLOBAL_5MIN = (20000.00 + 25000.00) / INTERVALOS_MES  # Licença e DevOps 
-    CUSTO_HW_5MIN = 45000.00 / INTERVALOS_MES              # Hardware (Pago por Servidor ligado)
+    CUSTO_GLOBAL_5MIN = (15000.00 + 15000.00) / INTERVALOS_MES # Licença e DevOps 
+    CUSTO_HW_5MIN = 12000.00 / INTERVALOS_MES             # Hardware (Pago por Servidor ligado)
     
     df_financeiro['CUSTO_5MIN'] = ( CUSTO_GLOBAL_5MIN + (df_financeiro['QTD_SERVIDORES'] * CUSTO_HW_5MIN) + df_financeiro['CUSTO_VAR_5MIN']
     ).round(2)
@@ -281,7 +295,22 @@ def dashFinanceiro(event, context):
     df_financeiro = df_financeiro.sort_values('DATE_5MIN').reset_index(drop=True)
 
     # ── KPIs mês corrente ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    mes_corrente = df_financeiro['MES'].max()
+    intervalos_por_mes = df_financeiro.groupby('MES').size().sort_index()
+    mes_mais_recente = intervalos_por_mes.index[-1]
+    mes_corrente = mes_mais_recente
+
+    if len(intervalos_por_mes) > 1:
+        mes_anterior_disponivel = intervalos_por_mes.index[-2]
+        poucos_dados_mes_recente = (
+            intervalos_por_mes.loc[mes_mais_recente] < 288 or
+            intervalos_por_mes.loc[mes_mais_recente] < (intervalos_por_mes.loc[mes_anterior_disponivel] * 0.25)
+        )
+
+        if poucos_dados_mes_recente:
+            mes_corrente = mes_anterior_disponivel
+
+    print("Mes mais recente no CSV:", mes_mais_recente)
+    print("Mes usado para KPIs e graficos mensais:", mes_corrente)
     df_mes_corr = df_financeiro[df_financeiro['MES'] == mes_corrente]
     receita_corrente = float(round(df_mes_corr['RECEITA_5MIN'].sum(), 2))
     custo_corrente   = float(round(df_mes_corr['CUSTO_5MIN'].sum(),   2))
@@ -314,12 +343,18 @@ def dashFinanceiro(event, context):
         .reset_index()
         .sort_values('MES')  
     )
+    historico_mensal = historico_mensal[historico_mensal['MES'] <= mes_corrente].copy()
 
-   
-    # Normalizador: Projeta meses quebrados (como o primeiro de 6 dias) para 30 dias - PRO-RATA
+    # Normalizador: Projeta meses quebrados para 30 dias - PRO-RATA
     INTERVALOS_PADRAO = 30 * 24 * 12 # 8640 intervalos de 5 min
-    historico_mensal['CUSTO_MES'] = historico_mensal['CUSTO_MES'] * (INTERVALOS_PADRAO / historico_mensal['QTD_INTERVALOS'])
-    historico_mensal['RECEITA_MES'] = historico_mensal['RECEITA_MES'] * (INTERVALOS_PADRAO / historico_mensal['QTD_INTERVALOS'])
+    
+    # Criar uma máscara para ignorar o mês que ainda está rodando (mes_corrente)
+    meses_fechados = historico_mensal['MES'] != mes_mais_recente
+    fator_escala = INTERVALOS_PADRAO / historico_mensal['QTD_INTERVALOS']
+    
+    # Aplica a multiplicação APENAS nos meses já fechados, deixando o mês atual intacto
+    historico_mensal.loc[meses_fechados, 'CUSTO_MES'] *= fator_escala[meses_fechados]
+    historico_mensal.loc[meses_fechados, 'RECEITA_MES'] *= fator_escala[meses_fechados]
 
     treino = historico_mensal[historico_mensal['MES'] < mes_corrente]
 
@@ -344,6 +379,7 @@ def dashFinanceiro(event, context):
     receita_prevista = float(forecastLinear(modelo_receita, x_prox)) if modelo_receita else None
     #Intervalo de Confiança de 95%
     ic_95 = float(round(1.96 * modelo_custo["MargemErro"], 2)) if modelo_custo else None
+    ic_95_receita = float(round(1.96 * modelo_receita["MargemErro"], 2)) if modelo_receita else None
   
 
     roi_previsto = None
@@ -404,7 +440,7 @@ def dashFinanceiro(event, context):
         "fixo_global": global_mes
     }
     
-   # GRÁFICO BARRAS Custo por datacenter e zona (mês corrente)
+   # GRÁFICO BARRAS Custo por datacenter (mês corrente)
     df_mes_completo = df[df['MES'] == mes_corrente].copy()
     
     
@@ -421,7 +457,7 @@ def dashFinanceiro(event, context):
     df_mes_completo['CUSTO_TOTAL_LINHA'] = df_mes_completo['CUSTO_VAR'] + CUSTO_HW_5MIN + (CUSTO_GLOBAL_5MIN / qtd_servidores_intervalo)
     
     barras_datacenter = (
-        df_mes_completo.groupby(['DATACENTER', 'ZONA'])
+        df_mes_completo.groupby('DATACENTER')
         .agg(
             custo=('CUSTO_VAR', 'sum'),                
             custo_total=('CUSTO_TOTAL_LINHA', 'sum'),   
@@ -447,7 +483,7 @@ def dashFinanceiro(event, context):
             custo         = lambda x: x['custo'].round(2),
             custo_energia = lambda x: x['custo_energia'].round(2),
             percentual = lambda x: (x['custo'] / x['custo'].sum() * 100).round(1),
-            datacenter = lambda x: x['DATACENTER'].astype(str).str.split('-').str[0],
+            datacenter = lambda x: x['DATACENTER'],
             zona = lambda x: x['ZONA'],
             status = lambda x: 'ativo'
         )
@@ -464,7 +500,7 @@ def dashFinanceiro(event, context):
     top_zonas = (
         zonas_agg
         .assign(
-            datacenter  = lambda x: x['DATACENTER'].astype(str).str.split('-').str[0],
+            datacenter  = lambda x: x['DATACENTER'],
             zona        = lambda x: x['ZONA'],
             custo_total = lambda x: x['custo_total'].round(2),
             energia     = lambda x: x['energia'].round(2),
@@ -478,22 +514,45 @@ def dashFinanceiro(event, context):
     
     # ── CARDS PREDITIVOS ──
     periodo_base = pd.Period(mes_corrente, 'M')
+    historico_mensal = historico_mensal.reset_index(drop=True)
     projecoes = []
     for i in range(1, 13):
-        x_i        = n_meses + i
-        c_prev     = float(forecastLinear(modelo_custo,   x_i)) if modelo_custo   else None
-        r_prev     = float(forecastLinear(modelo_receita, x_i)) if modelo_receita else None
+        x_i = n_meses + i
+        periodo_previsto = periodo_base + i
+        mes_ano_passado = str(periodo_previsto - 12)
+        mes_base = historico_mensal[historico_mensal['MES'] == mes_ano_passado]
+        if not mes_base.empty:
+            x_base = int(mes_base.index[0]) + 1
+            custo_base_real = float(mes_base.iloc[0]['CUSTO_MES'])
+            receita_base_real = float(mes_base.iloc[0]['RECEITA_MES'])
+            custo_base_regressao = float(forecastLinear(modelo_custo, x_base)) if modelo_custo else custo_base_real
+            receita_base_regressao = float(forecastLinear(modelo_receita, x_base)) if modelo_receita else receita_base_real
+            ajuste_sazonal_custo = custo_base_real - custo_base_regressao
+            ajuste_sazonal_receita = receita_base_real - receita_base_regressao
+            ajuste_sazonal_custo = max(-(ic_95 or 0), min(ajuste_sazonal_custo, ic_95 or 0))
+            ajuste_sazonal_receita = max(-(ic_95_receita or 0), min(ajuste_sazonal_receita, ic_95_receita or 0))
+        else:
+            ajuste_sazonal_custo = 0
+            ajuste_sazonal_receita = 0
+        c_prev_base = float(forecastLinear(modelo_custo,   x_i)) if modelo_custo   else None
+        r_prev_base = float(forecastLinear(modelo_receita, x_i)) if modelo_receita else None
+        c_prev     = float(round(max(0, c_prev_base + ajuste_sazonal_custo), 2)) if c_prev_base is not None else None
+        r_prev     = float(round(max(0, r_prev_base + ajuste_sazonal_receita), 2)) if r_prev_base is not None else None
         orc        = float(round(c_prev * (1 + MARGEM_ORCAMENTO), 2)) if c_prev else None
         roi_p      = float(round(((r_prev - c_prev) / c_prev) * 100, 2)) if (c_prev and r_prev and c_prev > 0) else None
         confianca  = max(50, round((r2_custo or 0) * 100 * (1 - i * 0.03)))
         projecoes.append({
-            "mes":              str(periodo_base + i),
+            "mes":              str(periodo_previsto),
             "custo_previsto":   c_prev,
             "receita_prevista": r_prev,
             "orcamento":        orc,
             "roi_previsto":     roi_p,
             "ic_95":            ic_95,
-            "confianca":        confianca
+            "confianca":        confianca,
+            "mes_base_sazonal":  mes_ano_passado,
+            "fluxo_sazonal":    "alto" if ajuste_sazonal_receita >= 0 else "baixo",
+            "ajuste_sazonal_custo": float(round(ajuste_sazonal_custo, 2)),
+            "ajuste_sazonal_receita": float(round(ajuste_sazonal_receita, 2))
         })
 
     return {
