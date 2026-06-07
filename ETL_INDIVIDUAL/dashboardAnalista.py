@@ -427,6 +427,26 @@ def dashAnalista(event, context):
 
                     dia_semana = datetime.now().strftime("%A") 
 
+                    if dia_semana == "Monday":
+                        dia_semana = "Segunda"
+                    
+                    elif dia_semana == "Tuesday":
+                        dia_semana = "Terça"
+
+                    elif dia_semana ==  "Wednesday":
+                        dia_semana = "Quarta"
+
+                    elif dia_semana == "Thursday":
+                        dia_semana = "Quinta"
+                    elif dia_semana == "Friday":
+                        dia_semana = "Sexta"
+                    elif dia_semana == "Saturday":
+                        dia_semana = "Sábado"
+                    elif dia_semana == "Sunday":
+                        dia_semana = "Domingo"
+                    else:
+                        print("data invalida")
+
                     servidores = df_zonas.groupby(["SERVIDOR"])
 
                     qtd_sobrecarregados = 0
