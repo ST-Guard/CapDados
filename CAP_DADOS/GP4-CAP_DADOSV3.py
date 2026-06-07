@@ -292,8 +292,13 @@ def capturaCSV(servidor):
         if manutencao:
             latencia_negocio = latencia_base * random.uniform(6, 12)
         else:
-            latencia_negocio = latencia_base * fator_hora * fator_latencia_dia[dia]
-            latencia_negocio += random.uniform(-2, 4)
+            latencia_negocio = latencia_base
+            # impacto menor do horário
+            latencia_negocio *= (1 + ((fator_hora - 1) * 0.15))
+            # impacto menor do dia
+            latencia_negocio *= (1 + ((fator_latencia_dia[dia] - 1) * 0.10))
+            # oscilação natural da rede
+            latencia_negocio += random.uniform(-5, 5)
 
         # sábado à noite: pico de jogadores
         if dia == 5 and 18 <= hora <= 23:
