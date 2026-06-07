@@ -201,21 +201,7 @@
                 },
                 "SERVIDOR-SP-05": {
                     "idServidor": 5,
-                    "chamados": {
-                        "10": {
-                            "id_alerta": 10,
-                            "componente": "DISCO",
-                            "valor": 472.0,
-                            "limite": 80.0,
-                            "severidade": "baixo",
-                            "issueKey": "KAN-H10",
-                            "status": "fechado",
-                            "abertura": "2026-05-07T09:00:00",
-                            "fechamento": "2026-05-08T07:00:00",
-                            "duracaoMinutos": 1320,
-                            "slaOk": 1
-                        }
-                    }
+                    "chamados": {}
                 },
                 "SERVIDOR-SP-06": {
                     "idServidor": 6,
