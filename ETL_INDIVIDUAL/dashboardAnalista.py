@@ -3,6 +3,7 @@ import boto3
 import pandas as pd
 import io
 import numpy as np
+import unicodedata
 from urllib.parse import unquote_plus
 from datetime import datetime, timedelta
 
@@ -62,10 +63,94 @@ def lambda_handler(event, context):
         }
 
 
+def padronizarNomeZona(valor):
+    if valor is None or pd.isna(valor):
+        return valor
+
+    textoNormalizado = normalizarTextoEstrutura(
+        valor
+    )
 
 
+    mapeamento = {
+        "zonaa": "Zona A",
+        "zonab": "Zona B",
+        "zonac": "Zona C"
+    }
+
+    return mapeamento.get(textoNormalizado,str(valor).strip())
 
 
+def padronizarNomeServidor(valor):
+    if valor is None or pd.isna(valor):
+        return valor
+
+    textoNormalizado = normalizarTextoEstrutura(valor)
+
+    if textoNormalizado.startswith("servidor"):
+        restante = textoNormalizado.replace("servidor", "",1)
+
+        if len(restante) >= 4:
+            uf = restante[:2].upper()
+            numero = restante[2:]
+
+            if numero.isdigit():
+                return (
+                    f"SERVIDOR-{uf}-"
+                    f"{numero.zfill(2)}"
+                )
+
+    return str(valor).strip()
+
+def verificarDuplicidadeServidores(dataframe):
+    associacoes = (
+        dataframe[
+            [
+                "EMPRESA",
+                "DATACENTER",
+                "ZONA",
+                "SERVIDOR"
+            ]
+        ]
+        .drop_duplicates()
+    )
+
+    quantidadeZonasPorServidor = (
+        associacoes
+        .groupby(
+            [
+                "EMPRESA",
+                "DATACENTER",
+                "SERVIDOR"
+            ]
+        )["ZONA"]
+        .nunique()
+    )
+
+    duplicados = quantidadeZonasPorServidor[
+        quantidadeZonasPorServidor > 1
+    ]
+
+    if duplicados.empty:
+        print("✅ Nenhum servidor associado "
+            "a mais de uma zona."
+        )
+        return
+
+    print(
+        "⚠️ Servidores associados a mais de uma zona:"
+    )
+
+    print(duplicados)
+
+
+def normalizarTextoEstrutura(valor):
+    if valor is None or pd.isna(valor):
+        return ""
+
+    texto = str(valor).strip().lower()
+    texto = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode("ascii")
+    return (texto.replace(" ", "").replace("-", "").replace("_", "").replace("\u00a0", ""))
 
 
 
@@ -111,9 +196,45 @@ def dashAnalista(event, context):
             }
 
         df["DATE"] = pd.to_datetime(df["DATE"], format='mixed')
+        df = df[df["DATACENTER"].str.match(r'^DC-[A-Z]+-\d+$')]
 
+        df["ZONA"] = df["ZONA"].apply(
+        padronizarNomeZona
+        )
 
+        # Remove diferenças de espaço, caixa e separadores.
+        df["SERVIDOR"] = df["SERVIDOR"].apply(
+        padronizarNomeServidor
+        )
 
+        print(
+        "Zonas encontradas após padronização:",
+        sorted(
+            df["ZONA"]
+            .dropna()
+            .unique()
+            .tolist()
+        )
+    )
+
+        quantidadeAntes = len(df)
+
+        df = df.drop_duplicates(
+        subset=[
+            "EMPRESA",
+            "REGIAO",
+            "DATACENTER",
+            "ZONA",
+            "SERVIDOR",
+            "DATE"
+        ],
+        keep="last"
+    )
+
+        print(
+        "Duplicidades removidas:",
+        quantidadeAntes - len(df)
+    )
 
         
         
@@ -240,12 +361,12 @@ def dashAnalista(event, context):
 
 
 
-
+                    chaves_zona = nome_zona.replace(" ", "")
                     metricas_zona = ""
                     
 
                     try:
-                        metricas_zona = metricas_datacenter[nome_zona]
+                        metricas_zona = metricas_datacenter[chaves_zona]
 
                     except:
                          print("essa zona nao popssui metricas")
@@ -258,11 +379,13 @@ def dashAnalista(event, context):
                     mttr_zona = 0
 
 
+
+
                     try:
-                            alertas_zona = alertas_datacenter[nome_zona]                     
+                            alertas_zona = alertas_datacenter[chaves_zona]                     
                             quantidade_servidores = alertas_zona["QTD_SERVIDORES"]
                             quantidade_chamados_aberto = alertas_zona["QUANTIDADE_ABERTO"]
-                            mttr_zona = alertas_zona["MTRR_ZONA"]
+                            mttr_zona = alertas_zona["MTTR_ZONA"]
 
                     except:
                          print("nao possui alertas salvos")
@@ -366,7 +489,7 @@ def dashAnalista(event, context):
 
                         ultima_latencia = df_servidor["LATENCIA"].iloc[-1]
 
-                        if ultima_ram > limite_ram or ultima_cpu > limite_cpu  or ultima_disco > limite_disco:
+                        if ultima_ram > (limite_ram - (limite_ram * 0.10))  or ultima_cpu > (limite_cpu - (limite_cpu * 0.10))  or ultima_disco > (limite_disco - (limite_disco * 0.10)):
                             qtd_sobrecarregados = qtd_sobrecarregados + 1
 
 
