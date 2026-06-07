@@ -16,7 +16,7 @@ import random
 
 
 arquivo_csv = "dados-brutos_maquina.csv"
-bucket_name = 'smartdatabucket2'
+bucket_name = 'smartdatabucket3'
 
 #STE12345
 #SERVIDOR-SP-01
@@ -376,7 +376,7 @@ def capturaCSV(servidor):
 
         # API Steam 
         jogadores_globais  = buscarJogadoresAtivos()
-        jogadores_nossos = jogadores_globais * 0.4 # pegando a quantidade de jogadores brasileiros
+        jogadores_nossos = round(jogadores_globais * 0.4,2)
 
 
 
