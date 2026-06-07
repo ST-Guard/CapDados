@@ -9,8 +9,8 @@
                     "idDataCenter": 1,
                     "limites": {
                         "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
+                        "RAM": 85.0,
+                        "DISCO": 80.0,
                         "REDE": 40.0
                     },
                     "limiteIds": {
@@ -27,10 +27,10 @@
                     "idServidor": 2,
                     "idDataCenter": 1,
                     "limites": {
-                        "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
-                        "REDE": 40.0
+                        "CPU": 85.0,
+                        "RAM": 80.0,
+                        "DISCO": 85.0,
+                        "REDE": 45.0
                     },
                     "limiteIds": {
                         "CPU": 1,
@@ -46,9 +46,9 @@
                     "idServidor": 3,
                     "idDataCenter": 1,
                     "limites": {
-                        "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
+                        "CPU": 90.0,
+                        "RAM": 75.0,
+                        "DISCO": 80.0,
                         "REDE": 40.0
                     },
                     "limiteIds": {
@@ -68,9 +68,9 @@
                     "idDataCenter": 1,
                     "limites": {
                         "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
-                        "REDE": 40.0
+                        "RAM": 90.0,
+                        "DISCO": 75.0,
+                        "REDE": 50.0
                     },
                     "limiteIds": {
                         "CPU": 1,
@@ -86,10 +86,10 @@
                     "idServidor": 5,
                     "idDataCenter": 1,
                     "limites": {
-                        "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
-                        "REDE": 40.0
+                        "CPU": 75.0,
+                        "RAM": 80.0,
+                        "DISCO": 90.0,
+                        "REDE": 35.0
                     },
                     "limiteIds": {
                         "CPU": 1,
@@ -105,10 +105,10 @@
                     "idServidor": 6,
                     "idDataCenter": 1,
                     "limites": {
-                        "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
-                        "REDE": 40.0
+                        "CPU": 85.0,
+                        "RAM": 85.0,
+                        "DISCO": 80.0,
+                        "REDE": 45.0
                     },
                     "limiteIds": {
                         "CPU": 1,
@@ -127,8 +127,8 @@
                     "idDataCenter": 1,
                     "limites": {
                         "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
+                        "RAM": 75.0,
+                        "DISCO": 85.0,
                         "REDE": 40.0
                     },
                     "limiteIds": {
@@ -145,10 +145,10 @@
                     "idServidor": 8,
                     "idDataCenter": 1,
                     "limites": {
-                        "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
-                        "REDE": 40.0
+                        "CPU": 90.0,
+                        "RAM": 80.0,
+                        "DISCO": 80.0,
+                        "REDE": 55.0
                     },
                     "limiteIds": {
                         "CPU": 1,
@@ -164,10 +164,10 @@
                     "idServidor": 9,
                     "idDataCenter": 1,
                     "limites": {
-                        "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
-                        "REDE": 40.0
+                        "CPU": 85.0,
+                        "RAM": 90.0,
+                        "DISCO": 75.0,
+                        "REDE": 50.0
                     },
                     "limiteIds": {
                         "CPU": 1,
@@ -188,8 +188,8 @@
                     "idDataCenter": 2,
                     "limites": {
                         "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
+                        "RAM": 85.0,
+                        "DISCO": 90.0,
                         "REDE": 40.0
                     },
                     "limiteIds": {
@@ -206,10 +206,10 @@
                     "idServidor": 11,
                     "idDataCenter": 2,
                     "limites": {
-                        "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
-                        "REDE": 40.0
+                        "CPU": 75.0,
+                        "RAM": 80.0,
+                        "DISCO": 85.0,
+                        "REDE": 35.0
                     },
                     "limiteIds": {
                         "CPU": 1,
@@ -225,10 +225,10 @@
                     "idServidor": 12,
                     "idDataCenter": 2,
                     "limites": {
-                        "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
-                        "REDE": 40.0
+                        "CPU": 85.0,
+                        "RAM": 75.0,
+                        "DISCO": 80.0,
+                        "REDE": 45.0
                     },
                     "limiteIds": {
                         "CPU": 1,
@@ -246,10 +246,10 @@
                     "idServidor": 13,
                     "idDataCenter": 2,
                     "limites": {
-                        "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
-                        "REDE": 40.0
+                        "CPU": 90.0,
+                        "RAM": 85.0,
+                        "DISCO": 75.0,
+                        "REDE": 60.0
                     },
                     "limiteIds": {
                         "CPU": 1,
@@ -266,9 +266,9 @@
                     "idDataCenter": 2,
                     "limites": {
                         "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
-                        "REDE": 40.0
+                        "RAM": 90.0,
+                        "DISCO": 85.0,
+                        "REDE": 50.0
                     },
                     "limiteIds": {
                         "CPU": 1,
@@ -284,10 +284,10 @@
                     "idServidor": 15,
                     "idDataCenter": 2,
                     "limites": {
-                        "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
-                        "REDE": 40.0
+                        "CPU": 85.0,
+                        "RAM": 80.0,
+                        "DISCO": 90.0,
+                        "REDE": 45.0
                     },
                     "limiteIds": {
                         "CPU": 1,
@@ -305,9 +305,9 @@
                     "idServidor": 16,
                     "idDataCenter": 2,
                     "limites": {
-                        "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
+                        "CPU": 75.0,
+                        "RAM": 85.0,
+                        "DISCO": 80.0,
                         "REDE": 40.0
                     },
                     "limiteIds": {
@@ -325,9 +325,9 @@
                     "idDataCenter": 2,
                     "limites": {
                         "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
-                        "REDE": 40.0
+                        "RAM": 75.0,
+                        "DISCO": 85.0,
+                        "REDE": 35.0
                     },
                     "limiteIds": {
                         "CPU": 1,
@@ -343,10 +343,10 @@
                     "idServidor": 18,
                     "idDataCenter": 2,
                     "limites": {
-                        "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
-                        "REDE": 40.0
+                        "CPU": 90.0,
+                        "RAM": 80.0,
+                        "DISCO": 75.0,
+                        "REDE": 55.0
                     },
                     "limiteIds": {
                         "CPU": 1,
@@ -366,10 +366,10 @@
                     "idServidor": 19,
                     "idDataCenter": 3,
                     "limites": {
-                        "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
-                        "REDE": 40.0
+                        "CPU": 85.0,
+                        "RAM": 90.0,
+                        "DISCO": 80.0,
+                        "REDE": 50.0
                     },
                     "limiteIds": {
                         "CPU": 1,
@@ -386,9 +386,9 @@
                     "idDataCenter": 3,
                     "limites": {
                         "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
-                        "REDE": 40.0
+                        "RAM": 85.0,
+                        "DISCO": 90.0,
+                        "REDE": 45.0
                     },
                     "limiteIds": {
                         "CPU": 1,
@@ -404,9 +404,9 @@
                     "idServidor": 21,
                     "idDataCenter": 3,
                     "limites": {
-                        "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
+                        "CPU": 75.0,
+                        "RAM": 80.0,
+                        "DISCO": 85.0,
                         "REDE": 40.0
                     },
                     "limiteIds": {
@@ -425,10 +425,10 @@
                     "idServidor": 22,
                     "idDataCenter": 3,
                     "limites": {
-                        "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
-                        "REDE": 40.0
+                        "CPU": 85.0,
+                        "RAM": 75.0,
+                        "DISCO": 80.0,
+                        "REDE": 35.0
                     },
                     "limiteIds": {
                         "CPU": 1,
@@ -444,10 +444,10 @@
                     "idServidor": 23,
                     "idDataCenter": 3,
                     "limites": {
-                        "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
-                        "REDE": 40.0
+                        "CPU": 90.0,
+                        "RAM": 85.0,
+                        "DISCO": 75.0,
+                        "REDE": 60.0
                     },
                     "limiteIds": {
                         "CPU": 1,
@@ -464,9 +464,9 @@
                     "idDataCenter": 3,
                     "limites": {
                         "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
-                        "REDE": 40.0
+                        "RAM": 90.0,
+                        "DISCO": 85.0,
+                        "REDE": 50.0
                     },
                     "limiteIds": {
                         "CPU": 1,
@@ -484,10 +484,10 @@
                     "idServidor": 25,
                     "idDataCenter": 3,
                     "limites": {
-                        "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
-                        "REDE": 40.0
+                        "CPU": 85.0,
+                        "RAM": 80.0,
+                        "DISCO": 90.0,
+                        "REDE": 45.0
                     },
                     "limiteIds": {
                         "CPU": 1,
@@ -503,9 +503,9 @@
                     "idServidor": 26,
                     "idDataCenter": 3,
                     "limites": {
-                        "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
+                        "CPU": 75.0,
+                        "RAM": 85.0,
+                        "DISCO": 80.0,
                         "REDE": 40.0
                     },
                     "limiteIds": {
@@ -522,10 +522,10 @@
                     "idServidor": 27,
                     "idDataCenter": 3,
                     "limites": {
-                        "CPU": 80.0,
-                        "RAM": 16.0,
-                        "DISCO": 450.0,
-                        "REDE": 40.0
+                        "CPU": 90.0,
+                        "RAM": 75.0,
+                        "DISCO": 85.0,
+                        "REDE": 55.0
                     },
                     "limiteIds": {
                         "CPU": 1,

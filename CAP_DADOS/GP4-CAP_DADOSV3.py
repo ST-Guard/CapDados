@@ -16,7 +16,7 @@ import random
 
 
 arquivo_csv = "dados-brutos_maquina.csv"
-bucket_name = 'smartdatabucket-17-04'
+bucket_name = 'smartdatabucket2'
 
 #STE12345
 #SERVIDOR-SP-01
@@ -624,6 +624,7 @@ def capturaJson():
 
      # pegando os dados das empresas
 
+     # pegando os dados das empresas
     cursor = conexao_json.cursor()
 
     query_empresas = "SELECT * FROM empresa"
@@ -693,12 +694,12 @@ def capturaJson():
 
                         
 
-                        query_mttr_zona = f"""  
-        SELECT z.nome, AVG(mttr_minutos) FROM zona z 
-        JOIN servidor ON fkZona = z.idZona 
-        JOIN registros_alertas ON fkRegistroServidor = idServidor WHERE z.idZona = {id_zona} GROUP BY z.nome;
+                        query_mttr_zona = f"""
+SELECT z.nome, AVG(mttr_minutos) FROM zona z 
+JOIN servidor ON fkZona = z.idZona 
+JOIN registros_alertas ON fkRegistroServidor = idServidor WHERE z.idZona = {id_zona} GROUP BY z.nome;
 
-        """
+"""
                         cursor.execute(query_mttr_zona)
                         mttr = cursor.fetchall()
 
@@ -709,7 +710,7 @@ def capturaJson():
             SELECT z.nome, count(z.idZona) as "Quantidade de servidores" FROM zona z 
                         JOIN servidor ON fkZona = z.idZona 
                           WHERE z.idZona = {id_zona} GROUP BY z.nome;
-        """
+"""
                         
                         cursor.execute(query_qtd_servidores)
                         qtd_servidores = cursor.fetchall()
@@ -755,54 +756,89 @@ def capturaJson():
                    
 
 
-                                query_alerta = f"SELECT r.*, c.nome FROM registros_alertas r JOIN componentes c ON idComponente = r.fkRegistroComponente WHERE  r.fkRegistroServidor = {id_servidor}  AND r.dataHora >= DATE_SUB(NOW(), INTERVAL 7 DAY); "
-                                cursor.execute(query_alerta)
-                                alerta_servidor = cursor.fetchall()
+                                query_alerta = """
+                                    SELECT
+                                        r.idRegistro,
+                                        r.valor,
+                                        r.threshold_momento,
+                                        r.severidade,
+                                        r.issue_key,
+                                        r.aberto_em,
+                                        r.resolvido_em,
+                                        r.mttr_minutos,
+                                        r.sla_ok,
+                                        r.fkRegistroServidor,
+                                        r.fkRegistroComponente,
+                                        c.nome AS componente
+                                    FROM registros_alertas r
+                                    JOIN componentes c
+                                        ON c.idComponente = r.fkRegistroComponente
+                                    WHERE r.fkRegistroServidor = %s
+                                    AND r.aberto_em < NOW()
+                                    AND (
+                                            r.resolvido_em >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                                            OR r.resolvido_em IS NULL
+                                        )
+                                    ORDER BY r.aberto_em;
+                                """
 
-                                alerta_servidor_dicionario = {
+                                cursor.execute(query_alerta, (id_servidor,))
+                                alertas_servidor = cursor.fetchall()
 
-                                }
+                                alerta_servidor_dicionario = {}
 
+                                for alerta in alertas_servidor:
+                                    id_alerta = alerta[0]
+                                    valor = alerta[1]
+                                    threshold_momento = alerta[2]
+                                    severidade = alerta[3]
+                                    issue_key = alerta[4]
+                                    abertura = alerta[5]
+                                    resolvido_em = alerta[6]
+                                    mttr_minutos = alerta[7]
+                                    sla_ok = alerta[8]
+                                    componente = alerta[11]
 
-                                for alerta in alerta_servidor:
-                              
-
-
-                                    status_chamado = ""
-                                    if alerta[7] == None:
+                                    if resolvido_em is None:
                                         status_chamado = "aberto"
+                                        fechamento = None
+
+                                        if abertura is not None:
+                                            duracao_atual_minutos = int(
+                                                (datetime.now() - abertura).total_seconds() / 60
+                                            )
+                                        else:
+                                            duracao_atual_minutos = None
+
                                     else:
                                         status_chamado = "fechado"
+                                        fechamento = resolvido_em.isoformat()
 
+                                        if mttr_minutos is not None:
+                                            duracao_atual_minutos = mttr_minutos
+                                        elif abertura is not None:
+                                            duracao_atual_minutos = int(
+                                                (resolvido_em - abertura).total_seconds() / 60
+                                            )
+                                        else:
+                                            duracao_atual_minutos = None
 
-
-                                    fechamento = ""
-                                    if alerta[7] == None:
-                                        fechamento = "none"
-                                    else:
-                                        fechamento = alerta[7].strftime('%d/%m/%Y %H:%M')
-
-
-                                    duracao = ""
-
-                                    if alerta[8] == None:
-                                        duracao = "em_aberto"
-                                    else:
-                                        duracao = alerta[8]
-
-
-                            
-
-
-
-                                    alerta_servidor_dicionario[alerta[0]] = {
-                                        "id_alerta": alerta[0],
-                                        "componente": alerta[13],
+                                    alerta_servidor_dicionario[str(id_alerta)] = {
+                                        "id_alerta": id_alerta,
+                                        "componente": componente,
+                                        "valor": valor,
+                                        "limite": threshold_momento,
+                                        "severidade": severidade,
+                                        "issueKey": issue_key,
                                         "status": status_chamado,
-                                        "abertura": alerta[6].strftime('%d/%m/%Y %H:%M'),
+                                        "abertura": (
+                                            abertura.isoformat()
+                                            if abertura is not None
+                                            else None
+                                        ),
                                         "fechamento": fechamento,
-                                        "duracao": duracao
-
+                                        "duracaoMinutos": duracao_atual_minutos,
+                                        "slaOk": sla_ok
                                     }
 
 
