@@ -865,11 +865,11 @@ def calcularScoreRegiao(datacentersRegiao):
 MINIMO_COLETAS_TENDENCIA = 20
 
 # O componente precisa aparecer acima do limite
-# em pelo menos 20% das coletas atuais.
+# em pelo menos 10% das coletas atuais.
 MINIMA_PERSISTENCIA_ATUAL = 0.10
 
 # A persistência precisa ter aumentado pelo menos
-# 10 pontos percentuais entre as janelas.
+# 5 pontos percentuais entre as janelas.
 MINIMO_AUMENTO_PERSISTENCIA = 0.05
 
 
@@ -905,7 +905,8 @@ def obterConfigComponentes(limites):
             "limite": converter_float(
                 limites.get("CPU"),
                 LIMITE_CPU
-            )
+            ),
+            "peso": 1.0
         },
         {
             "nome": "RAM",
@@ -913,7 +914,8 @@ def obterConfigComponentes(limites):
             "limite": converter_float(
                 limites.get("RAM"),
                 LIMITE_RAM
-            )
+            ),
+            "peso": 1.0
         },
         {
             "nome": "Disco",
@@ -921,7 +923,8 @@ def obterConfigComponentes(limites):
             "limite": converter_float(
                 limites.get("DISCO"),
                 LIMITE_DISCO
-            )
+            ),
+            "peso": 0.8
         },
         {
             "nome": "Latência",
@@ -929,7 +932,8 @@ def obterConfigComponentes(limites):
             "limite": converter_float(
                 limites.get("REDE"),
                 LIMITE_LATENCIA
-            )
+            ),
+            "peso": 0.6
         }
        
     ]
@@ -950,8 +954,11 @@ def calcularTendenciaComponente(janelaAnterior, janelaAtual, configuracao):
         calcularPersistenciaComponente(janelaAtual, campo,limite)
     )
 
-    aumentoPersistencia = ( persistenciaAtual - persistenciaAnterior )
-    possuiTendencia = ( persistenciaAtual >= MINIMA_PERSISTENCIA_ATUAL and aumentoPersistencia >= MINIMO_AUMENTO_PERSISTENCIA)
+    peso = float(configuracao.get("peso", 1.0))    
+
+    aumentoPersistenciaBruto = (persistenciaAtual - persistenciaAnterior)
+    possuiTendencia = (persistenciaAtual >= MINIMA_PERSISTENCIA_ATUAL and aumentoPersistenciaBruto >= MINIMO_AUMENTO_PERSISTENCIA)
+    aumentoPersistencia = (aumentoPersistenciaBruto * peso)
 
     return {
         "componente": nome,
