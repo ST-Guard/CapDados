@@ -201,9 +201,12 @@ def dashAlertasGestora(dados, geral, bucket):
  
         if empresa not in resultado:
             resultado[empresa] = {}
+
+        if regiao_orig not in resultado[empresa]:
+            resultado[empresa][regiao_orig] = {}
  
-        if datacenter not in resultado[empresa]:
-            resultado[empresa][datacenter] = {
+        if datacenter not in resultado[empresa][regiao_orig]:
+            resultado[empresa][regiao_orig][datacenter] = {
                 "KPIs": {
                     "CRITICOS_ABERTOS":         0,
                     "MEDIOS_ABERTOS":            0,
@@ -225,7 +228,7 @@ def dashAlertasGestora(dados, geral, bucket):
                 }
             }
  
-        dc_dados = resultado[empresa][datacenter]
+        dc_dados = resultado[empresa][regiao_orig][datacenter]
         alertas_servidor_ciclo = 0
  
         for nome_comp, chave_metrica in COMPONENTES.items():
@@ -273,7 +276,7 @@ def dashAlertasGestora(dados, geral, bucket):
             }
  
             dc_dados["ALERTAS_ATIVOS"].append(alerta)
-            alertas_novos.append({**alerta, "datacenter": datacenter, "empresa": empresa})
+            alertas_novos.append({**alerta, "datacenter": datacenter, "empresa": empresa, "regiao": regiao_orig})   
 
         top_atual = dc_dados["KPIs"]["QTD_ALERTAS_SERVIDOR_TOP"]
         if alertas_servidor_ciclo > top_atual:
@@ -286,6 +289,7 @@ def dashAlertasGestora(dados, geral, bucket):
  
     for alerta_hist in historico_alertas:
         emp = str(alerta_hist.get("empresa",    ""))
+        regiao = str(alerta_hist.get("regiao",     "")) 
         dc  = str(alerta_hist.get("datacenter", ""))
         sev = str(alerta_hist.get("severidade", ""))
         ts  = str(alerta_hist.get("timestamp",  ""))
@@ -301,7 +305,7 @@ def dashAlertasGestora(dados, geral, bucket):
         num_semana  = dt.isocalendar()[1]
         ano_semana  = dt.isocalendar()[0]
         inicio_semana = dt - timedelta(days=dt.weekday())
-        chave_sem   = (emp, dc, f"{ano_semana}-S{num_semana:02d}")
+        chave_sem = (emp, regiao, dc, f"{ano_semana}-S{num_semana:02d}")
  
         if chave_sem not in semanas:
             semanas[chave_sem] = {
@@ -317,39 +321,42 @@ def dashAlertasGestora(dados, geral, bucket):
             semanas[chave_sem][sev]    += 1
             semanas[chave_sem]["total"] += 1
  
-    for (emp, dc, _), dados_semana in sorted(semanas.items()):
-        if emp in resultado and dc in resultado[emp]:
-            resultado[emp][dc]["GRAFICOS"]["ALERTAS_POR_SEMANA"].append(dados_semana)
- 
+        
+    
+    for (emp, regiao, dc, _), dados_semana in sorted(semanas.items()):
+         if emp in resultado and regiao in resultado[emp] and dc in resultado[emp][regiao]:
+             resultado[emp][regiao][dc]["GRAFICOS"]["ALERTAS_POR_SEMANA"].append(dados_semana)
+
     for emp in resultado:
-        for dc in resultado[emp]:
-            semanas_dc = resultado[emp][dc]["GRAFICOS"]["ALERTAS_POR_SEMANA"]
-            if not semanas_dc:
-                resultado[emp][dc]["GRAFICOS"]["RESUMO_SEMANAS"] = {
-                    "total_alertas":       0,
-                    "semana_mais_critica": None,
-                    "severidade_dominante": None,
-                    "alertas_dominante":   0
+        for regiao in resultado[emp]:
+            for dc in resultado[emp][regiao]:
+                semanas_dc = resultado[emp][regiao][dc]["GRAFICOS"]["ALERTAS_POR_SEMANA"]
+                if not semanas_dc:
+                    resultado[emp][regiao][dc]["GRAFICOS"]["RESUMO_SEMANAS"] = {
+                        "total_alertas":       0,
+                        "semana_mais_critica": None,
+                        "severidade_dominante": None,
+                        "alertas_dominante":   0
+                    }
+                    continue
+    
+                total_alertas = sum(s["total"] for s in semanas_dc)
+                semana_mais_critica = max(semanas_dc, key=lambda s: s["critico"])
+                total_baixo   = sum(s["baixo"]   for s in semanas_dc)
+                total_medio   = sum(s["medio"]   for s in semanas_dc)
+                total_critico = sum(s["critico"] for s in semanas_dc)
+    
+                sev_dom, qtd_dom = max(
+                    [("baixo", total_baixo), ("medio", total_medio), ("critico", total_critico)],
+                    key=lambda x: x[1]
+                )
+    
+                resultado[emp][regiao][dc]["GRAFICOS"]["RESUMO_SEMANAS"] = {
+                    "total_alertas":        total_alertas,
+                    "semana_mais_critica":  semana_mais_critica["semana"],
+                    "severidade_dominante": sev_dom,
+                    "alertas_dominante":    qtd_dom
                 }
-                continue
- 
-            total_alertas = sum(s["total"] for s in semanas_dc)
-            semana_mais_critica = max(semanas_dc, key=lambda s: s["critico"])
-            total_baixo   = sum(s["baixo"]   for s in semanas_dc)
-            total_medio   = sum(s["medio"]   for s in semanas_dc)
-            total_critico = sum(s["critico"] for s in semanas_dc)
- 
-            sev_dom, qtd_dom = max(
-                [("baixo", total_baixo), ("medio", total_medio), ("critico", total_critico)],
-                key=lambda x: x[1]
-            )
- 
-            resultado[emp][dc]["GRAFICOS"]["RESUMO_SEMANAS"] = {
-                "total_alertas":        total_alertas,
-                "semana_mais_critica":  semana_mais_critica["semana"],
-                "severidade_dominante": sev_dom,
-                "alertas_dominante":    qtd_dom
-            }
  
     historico_alertas.extend(alertas_novos)
     try:
