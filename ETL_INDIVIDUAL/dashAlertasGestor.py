@@ -302,15 +302,18 @@ def dashAlertasGestora(dados, geral, bucket):
         if dt < agora - timedelta(weeks=4):
             continue
  
-        num_semana  = dt.isocalendar()[1]
-        ano_semana  = dt.isocalendar()[0]
-        inicio_semana = dt - timedelta(days=dt.weekday())
-        chave_sem = (emp, regiao, dc, f"{ano_semana}-S{num_semana:02d}")
+        meses = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"]
+        semana_do_mes = ((dt.day - 1) // 7) + 1
+        nome_mes = meses[dt.month - 1]
+
+        label = f"{semana_do_mes}° sem {nome_mes}"
+
+        chave_sem = (emp, regiao, dc, f"{dt.year}-{dt.month:02d}-sem{semana_do_mes}")
  
         if chave_sem not in semanas:
             semanas[chave_sem] = {
-                "semana":       f"S{num_semana:02d}",
-                "inicio":       inicio_semana.strftime("%d/%m"),
+                "semana":       label,
+                "inicio":       (dt - timedelta(days=dt.weekday())).strftime("%d/%m"),
                 "baixo":        0,
                 "medio":        0,
                 "critico":      0,
