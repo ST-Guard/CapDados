@@ -16,7 +16,7 @@ import random
 
 
 arquivo_csv = "dados-brutos_maquina.csv"
-bucket_name = 'smartdatabucket3'
+bucket_name = 'smartdatabucket4'
 
 #STE12345
 #SERVIDOR-SP-01
@@ -479,7 +479,7 @@ def capturaCSV(servidor):
             -------------------JOGADORES STEAM (API)------------------------------
 
             JOGADORES ATIVOS: {jogadores_nossos} 
-        """)
+             """)
 
         CSV_DIC_WRITER.writerow(dados_dict)
         csvfile.flush()
@@ -567,6 +567,7 @@ def capturaJson():
     estruturaGeral = {}
     for linha in geral:
         empresa = linha["empresa"]
+        regiao = linha["estado"]
         datacenter = linha["datacenter"]
         zona = linha["zona"].replace(" ", "")
         servidor = linha["servidor"]
@@ -576,15 +577,19 @@ def capturaJson():
             estruturaGeral[empresa] = {}
 
         if datacenter not in estruturaGeral[empresa]:
-            estruturaGeral[empresa][datacenter] = {}
+            estruturaGeral[empresa][regiao] = {}
 
         if zona not in estruturaGeral[empresa][datacenter]:
-            estruturaGeral[empresa][datacenter][zona] = {}
+            estruturaGeral[empresa][regiao][datacenter] = {}
 
-        if servidor not in estruturaGeral[empresa][datacenter][zona]:
-            estruturaGeral[empresa][datacenter][zona][servidor] = {
+        if zona not in estruturaGeral[empresa][regiao][datacenter]:
+            estruturaGeral[empresa][regiao][datacenter][zona] = {}
+
+
+        if servidor not in estruturaGeral[empresa][regiao][datacenter][zona]:
+            estruturaGeral[empresa][regiao][datacenter][zona][servidor] = {
                 "tipo": linha["tipoServidor"],
-                "estado": linha["estadoServidor"], 
+                "estado": linha["estadoServidor"],
                 "idServidor": linha["idServidor"],
                 "idDataCenter": linha["idDataCenter"],
                 "limites": {},
@@ -592,11 +597,11 @@ def capturaJson():
                 "funcionarios": []
             }
 
-        estruturaGeral[empresa][datacenter][zona][servidor]["limites"][componente] = linha["limite"]
-        estruturaGeral[empresa][datacenter][zona][servidor]["limiteIds"][componente] = linha["idComponente"]
+        estruturaGeral[empresa][regiao][datacenter][zona][servidor]["limites"][componente] = linha["limite"]
+        estruturaGeral[empresa][regiao][datacenter][zona][servidor]["limiteIds"][componente] = linha["idComponente"]
         
     if linha["nomeAnalista"] and linha["nomeAnalista"] not in [f["nome"] for f in estruturaGeral[empresa][datacenter][zona][servidor]["funcionarios"]]:
-        estruturaGeral[empresa][datacenter][zona][servidor]["funcionarios"].append({
+        estruturaGeral[empresa][regiao][datacenter][zona][servidor]["funcionarios"].append({
             "id": linha["idAnalista"],
             "nome": linha["nomeAnalista"]
         })
@@ -700,10 +705,9 @@ def capturaJson():
                         
 
                         query_mttr_zona = f"""
-SELECT z.nome, AVG(mttr_minutos) FROM zona z 
-JOIN servidor ON fkZona = z.idZona  JOIN registros_alertas ON fkRegistroServidor = idServidor WHERE z.idZona = {id_zona} AND severidade like "critico" GROUP BY z.nome;
-
-"""
+                            SELECT z.nome, AVG(mttr_minutos) FROM zona z 
+                            JOIN servidor ON fkZona = z.idZona  JOIN registros_alertas ON fkRegistroServidor = idServidor WHERE z.idZona = {id_zona} AND severidade like "critico" GROUP BY z.nome;
+                            """
                         cursor.execute(query_mttr_zona)
                         mttr = cursor.fetchall()
 
@@ -711,10 +715,10 @@ JOIN servidor ON fkZona = z.idZona  JOIN registros_alertas ON fkRegistroServidor
 
 
                         query_qtd_servidores = f"""
-            SELECT z.nome, count(z.idZona) as "Quantidade de servidores" FROM zona z 
-                        JOIN servidor ON fkZona = z.idZona 
-                          WHERE z.idZona = {id_zona} GROUP BY z.nome;
-"""
+                                SELECT z.nome, count(z.idZona) as "Quantidade de servidores" FROM zona z 
+                                            JOIN servidor ON fkZona = z.idZona 
+                                            WHERE z.idZona = {id_zona} GROUP BY z.nome;
+                                            """
                         
                         cursor.execute(query_qtd_servidores)
                         qtd_servidores = cursor.fetchall()
@@ -854,6 +858,7 @@ JOIN servidor ON fkZona = z.idZona  JOIN registros_alertas ON fkRegistroServidor
 
     geral_json = json.dumps(dados_alertas, ensure_ascii=False, indent=4, default=str)
 
+    
     caminho_json = "ultimos_alertas.json"
 
     with open(caminho_json, "w", encoding="utf-8") as arquivo:

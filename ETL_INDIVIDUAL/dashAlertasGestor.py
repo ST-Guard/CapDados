@@ -53,7 +53,7 @@ def lambda_handler(event, context):
                     dados_dicionario.append(linha)
                 else: 
                     print(f"Alvo de 30 dias alcançado. Ignorando as próximas linhas.")
-                    break 
+                    continue 
             except Exception:
                 continue
         
@@ -67,6 +67,10 @@ def lambda_handler(event, context):
             print(f"metricas.json não encontrado — . Erro: {e}")
 
         # DASHBOARD ALERTAS  - Victor G
+
+        print(f"Linhas carregadas no CSV: {len(conteudo_csv)}")
+        print(f"Linhas válidas após filtro: {len(dados_dicionario)}")
+
         respAlertasGestora = dashAlertasGestora(dados_dicionario, metricas, bucket)
 
         # DASH DE ALERTAS - Victor G (Salvando o resultado)

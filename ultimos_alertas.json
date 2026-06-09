@@ -1,28 +1,138 @@
 {
     "Steam": {
-        "SP": {
-            "Zona A": {
+        "DC-SP-01": {
+            "ZonaA": {
                 "QUANTIDADE_ABERTO": 0,
-                "MTTR_ZONA": "197.1429",
+                "MTTR_ZONA": "60.0000",
+                "QTD_SERVIDORES": 3,
                 "SERVIDOR-SP-01": {
                     "idServidor": 1,
-                    "chamados": {}
+                    "chamados": {
+                        "13": {
+                            "id_alerta": 13,
+                            "componente": "CPU",
+                            "valor": 96.0,
+                            "limite": 80.0,
+                            "severidade": "critico",
+                            "issueKey": "KAN-H13",
+                            "status": "fechado",
+                            "abertura": "2026-05-12T08:30:00",
+                            "fechamento": "2026-05-12T09:00:00",
+                            "duracaoMinutos": 30,
+                            "slaOk": 1
+                        },
+                        "15": {
+                            "id_alerta": 15,
+                            "componente": "RAM",
+                            "valor": 19.0,
+                            "limite": 16.0,
+                            "severidade": "critico",
+                            "issueKey": "KAN-H15",
+                            "status": "fechado",
+                            "abertura": "2026-05-13T09:00:00",
+                            "fechamento": "2026-05-13T10:10:00",
+                            "duracaoMinutos": 70,
+                            "slaOk": 0
+                        },
+                        "19": {
+                            "id_alerta": 19,
+                            "componente": "CPU",
+                            "valor": 91.0,
+                            "limite": 80.0,
+                            "severidade": "critico",
+                            "issueKey": "KAN-H19",
+                            "status": "fechado",
+                            "abertura": "2026-05-19T07:30:00",
+                            "fechamento": "2026-05-19T08:20:00",
+                            "duracaoMinutos": 50,
+                            "slaOk": 1
+                        }
+                    }
                 },
                 "SERVIDOR-SP-02": {
                     "idServidor": 2,
-                    "chamados": {}
+                    "chamados": {
+                        "18": {
+                            "id_alerta": 18,
+                            "componente": "CPU",
+                            "valor": 90.0,
+                            "limite": 80.0,
+                            "severidade": "critico",
+                            "issueKey": "KAN-H18",
+                            "status": "fechado",
+                            "abertura": "2026-05-16T11:00:00",
+                            "fechamento": "2026-05-16T12:30:00",
+                            "duracaoMinutos": 90,
+                            "slaOk": 0
+                        }
+                    }
                 },
                 "SERVIDOR-SP-03": {
                     "idServidor": 3,
-                    "chamados": {}
+                    "chamados": {
+                        "16": {
+                            "id_alerta": 16,
+                            "componente": "REDE",
+                            "valor": 48.0,
+                            "limite": 40.0,
+                            "severidade": "medio",
+                            "issueKey": "KAN-H16",
+                            "status": "fechado",
+                            "abertura": "2026-05-14T14:00:00",
+                            "fechamento": "2026-05-14T17:00:00",
+                            "duracaoMinutos": 180,
+                            "slaOk": 1
+                        },
+                        "20": {
+                            "id_alerta": 20,
+                            "componente": "CPU",
+                            "valor": 85.0,
+                            "limite": 80.0,
+                            "severidade": "medio",
+                            "issueKey": "KAN-H20",
+                            "status": "fechado",
+                            "abertura": "2026-05-20T10:00:00",
+                            "fechamento": "2026-05-20T13:30:00",
+                            "duracaoMinutos": 210,
+                            "slaOk": 1
+                        }
+                    }
                 }
             },
-            "Zona B": {
+            "ZonaB": {
                 "QUANTIDADE_ABERTO": 0,
-                "MTTR_ZONA": "325.0000",
+                "MTTR_ZONA": "90.0000",
+                "QTD_SERVIDORES": 3,
                 "SERVIDOR-SP-04": {
                     "idServidor": 4,
-                    "chamados": {}
+                    "chamados": {
+                        "14": {
+                            "id_alerta": 14,
+                            "componente": "CPU",
+                            "valor": 93.0,
+                            "limite": 80.0,
+                            "severidade": "critico",
+                            "issueKey": "KAN-H14",
+                            "status": "fechado",
+                            "abertura": "2026-05-12T10:00:00",
+                            "fechamento": "2026-05-12T11:30:00",
+                            "duracaoMinutos": 90,
+                            "slaOk": 0
+                        },
+                        "21": {
+                            "id_alerta": 21,
+                            "componente": "RAM",
+                            "valor": 18.0,
+                            "limite": 16.0,
+                            "severidade": "medio",
+                            "issueKey": "KAN-H21",
+                            "status": "fechado",
+                            "abertura": "2026-05-21T09:00:00",
+                            "fechamento": "2026-05-21T12:00:00",
+                            "duracaoMinutos": 180,
+                            "slaOk": 1
+                        }
+                    }
                 },
                 "SERVIDOR-SP-05": {
                     "idServidor": 5,
@@ -33,16 +143,45 @@
                     "chamados": {}
                 }
             },
-            "Zona C": {
+            "ZonaC": {
                 "QUANTIDADE_ABERTO": 0,
-                "MTTR_ZONA": "1320.0000",
+                "MTTR_ZONA": 0,
+                "QTD_SERVIDORES": 3,
                 "SERVIDOR-SP-07": {
                     "idServidor": 7,
-                    "chamados": {}
+                    "chamados": {
+                        "17": {
+                            "id_alerta": 17,
+                            "componente": "DISCO",
+                            "valor": 475.0,
+                            "limite": 450.0,
+                            "severidade": "baixo",
+                            "issueKey": "KAN-H17",
+                            "status": "fechado",
+                            "abertura": "2026-05-15T08:00:00",
+                            "fechamento": "2026-05-16T06:00:00",
+                            "duracaoMinutos": 1320,
+                            "slaOk": 1
+                        }
+                    }
                 },
                 "SERVIDOR-SP-08": {
                     "idServidor": 8,
-                    "chamados": {}
+                    "chamados": {
+                        "22": {
+                            "id_alerta": 22,
+                            "componente": "DISCO",
+                            "valor": 468.0,
+                            "limite": 450.0,
+                            "severidade": "baixo",
+                            "issueKey": "KAN-H22",
+                            "status": "fechado",
+                            "abertura": "2026-05-22T08:00:00",
+                            "fechamento": "2026-05-23T06:00:00",
+                            "duracaoMinutos": 1320,
+                            "slaOk": 1
+                        }
+                    }
                 },
                 "SERVIDOR-SP-09": {
                     "idServidor": 9,
@@ -50,42 +189,142 @@
                 }
             }
         },
-        "RJ": {
-            "Zona A": {
+        "DC-RJ-01": {
+            "ZonaA": {
                 "QUANTIDADE_ABERTO": 0,
-                "MTTR_ZONA": "258.8889",
+                "MTTR_ZONA": "50.0000",
+                "QTD_SERVIDORES": 3,
                 "SERVIDOR-RJ-01": {
                     "idServidor": 10,
-                    "chamados": {}
+                    "chamados": {
+                        "31": {
+                            "id_alerta": 31,
+                            "componente": "CPU",
+                            "valor": 97.0,
+                            "limite": 80.0,
+                            "severidade": "critico",
+                            "issueKey": "KAN-H31",
+                            "status": "fechado",
+                            "abertura": "2026-05-12T07:00:00",
+                            "fechamento": "2026-05-12T07:45:00",
+                            "duracaoMinutos": 45,
+                            "slaOk": 1
+                        },
+                        "35": {
+                            "id_alerta": 35,
+                            "componente": "CPU",
+                            "valor": 90.0,
+                            "limite": 80.0,
+                            "severidade": "critico",
+                            "issueKey": "KAN-H35",
+                            "status": "fechado",
+                            "abertura": "2026-05-19T08:00:00",
+                            "fechamento": "2026-05-19T08:55:00",
+                            "duracaoMinutos": 55,
+                            "slaOk": 1
+                        }
+                    }
                 },
                 "SERVIDOR-RJ-02": {
                     "idServidor": 11,
-                    "chamados": {}
+                    "chamados": {
+                        "33": {
+                            "id_alerta": 33,
+                            "componente": "RAM",
+                            "valor": 18.0,
+                            "limite": 16.0,
+                            "severidade": "medio",
+                            "issueKey": "KAN-H33",
+                            "status": "fechado",
+                            "abertura": "2026-05-14T10:00:00",
+                            "fechamento": "2026-05-14T13:00:00",
+                            "duracaoMinutos": 180,
+                            "slaOk": 1
+                        }
+                    }
                 },
                 "SERVIDOR-RJ-03": {
                     "idServidor": 12,
-                    "chamados": {}
+                    "chamados": {
+                        "36": {
+                            "id_alerta": 36,
+                            "componente": "REDE",
+                            "valor": 47.0,
+                            "limite": 40.0,
+                            "severidade": "medio",
+                            "issueKey": "KAN-H36",
+                            "status": "fechado",
+                            "abertura": "2026-05-20T11:00:00",
+                            "fechamento": "2026-05-20T14:30:00",
+                            "duracaoMinutos": 210,
+                            "slaOk": 1
+                        }
+                    }
                 }
             },
-            "Zona B": {
+            "ZonaB": {
                 "QUANTIDADE_ABERTO": 0,
-                "MTTR_ZONA": "745.0000",
+                "MTTR_ZONA": "110.0000",
+                "QTD_SERVIDORES": 3,
                 "SERVIDOR-RJ-04": {
                     "idServidor": 13,
-                    "chamados": {}
+                    "chamados": {
+                        "32": {
+                            "id_alerta": 32,
+                            "componente": "CPU",
+                            "valor": 94.0,
+                            "limite": 80.0,
+                            "severidade": "critico",
+                            "issueKey": "KAN-H32",
+                            "status": "fechado",
+                            "abertura": "2026-05-13T09:00:00",
+                            "fechamento": "2026-05-13T10:30:00",
+                            "duracaoMinutos": 90,
+                            "slaOk": 0
+                        }
+                    }
                 },
                 "SERVIDOR-RJ-05": {
                     "idServidor": 14,
-                    "chamados": {}
+                    "chamados": {
+                        "37": {
+                            "id_alerta": 37,
+                            "componente": "DISCO",
+                            "valor": 469.0,
+                            "limite": 450.0,
+                            "severidade": "baixo",
+                            "issueKey": "KAN-H37",
+                            "status": "fechado",
+                            "abertura": "2026-05-21T08:00:00",
+                            "fechamento": "2026-05-22T07:00:00",
+                            "duracaoMinutos": 1380,
+                            "slaOk": 0
+                        }
+                    }
                 },
                 "SERVIDOR-RJ-06": {
                     "idServidor": 15,
-                    "chamados": {}
+                    "chamados": {
+                        "34": {
+                            "id_alerta": 34,
+                            "componente": "DISCO",
+                            "valor": 476.0,
+                            "limite": 450.0,
+                            "severidade": "baixo",
+                            "issueKey": "KAN-H34",
+                            "status": "fechado",
+                            "abertura": "2026-05-15T09:00:00",
+                            "fechamento": "2026-05-16T08:00:00",
+                            "duracaoMinutos": 1380,
+                            "slaOk": 0
+                        }
+                    }
                 }
             },
-            "Zona C": {
+            "ZonaC": {
                 "QUANTIDADE_ABERTO": 0,
                 "MTTR_ZONA": 0,
+                "QTD_SERVIDORES": 3,
                 "SERVIDOR-RJ-07": {
                     "idServidor": 16,
                     "chamados": {}
@@ -100,42 +339,142 @@
                 }
             }
         },
-        "RS": {
-            "Zona A": {
+        "DC-RS-01": {
+            "ZonaA": {
                 "QUANTIDADE_ABERTO": 0,
-                "MTTR_ZONA": "267.2222",
+                "MTTR_ZONA": "53.7500",
+                "QTD_SERVIDORES": 3,
                 "SERVIDOR-RS-01": {
                     "idServidor": 19,
-                    "chamados": {}
+                    "chamados": {
+                        "46": {
+                            "id_alerta": 46,
+                            "componente": "CPU",
+                            "valor": 96.0,
+                            "limite": 80.0,
+                            "severidade": "critico",
+                            "issueKey": "KAN-H46",
+                            "status": "fechado",
+                            "abertura": "2026-05-12T08:00:00",
+                            "fechamento": "2026-05-12T08:50:00",
+                            "duracaoMinutos": 50,
+                            "slaOk": 1
+                        },
+                        "50": {
+                            "id_alerta": 50,
+                            "componente": "CPU",
+                            "valor": 95.0,
+                            "limite": 80.0,
+                            "severidade": "critico",
+                            "issueKey": "KAN-H50",
+                            "status": "fechado",
+                            "abertura": "2026-05-19T09:00:00",
+                            "fechamento": "2026-05-19T09:52:00",
+                            "duracaoMinutos": 52,
+                            "slaOk": 1
+                        }
+                    }
                 },
                 "SERVIDOR-RS-02": {
                     "idServidor": 20,
-                    "chamados": {}
+                    "chamados": {
+                        "48": {
+                            "id_alerta": 48,
+                            "componente": "RAM",
+                            "valor": 18.0,
+                            "limite": 16.0,
+                            "severidade": "medio",
+                            "issueKey": "KAN-H48",
+                            "status": "fechado",
+                            "abertura": "2026-05-14T09:00:00",
+                            "fechamento": "2026-05-14T12:00:00",
+                            "duracaoMinutos": 180,
+                            "slaOk": 1
+                        }
+                    }
                 },
                 "SERVIDOR-RS-03": {
                     "idServidor": 21,
-                    "chamados": {}
+                    "chamados": {
+                        "51": {
+                            "id_alerta": 51,
+                            "componente": "REDE",
+                            "valor": 46.0,
+                            "limite": 40.0,
+                            "severidade": "medio",
+                            "issueKey": "KAN-H51",
+                            "status": "fechado",
+                            "abertura": "2026-05-20T10:00:00",
+                            "fechamento": "2026-05-20T13:30:00",
+                            "duracaoMinutos": 210,
+                            "slaOk": 1
+                        }
+                    }
                 }
             },
-            "Zona B": {
+            "ZonaB": {
                 "QUANTIDADE_ABERTO": 0,
-                "MTTR_ZONA": "740.0000",
+                "MTTR_ZONA": "100.0000",
+                "QTD_SERVIDORES": 3,
                 "SERVIDOR-RS-04": {
                     "idServidor": 22,
-                    "chamados": {}
+                    "chamados": {
+                        "47": {
+                            "id_alerta": 47,
+                            "componente": "CPU",
+                            "valor": 92.0,
+                            "limite": 80.0,
+                            "severidade": "critico",
+                            "issueKey": "KAN-H47",
+                            "status": "fechado",
+                            "abertura": "2026-05-13T10:00:00",
+                            "fechamento": "2026-05-13T11:30:00",
+                            "duracaoMinutos": 90,
+                            "slaOk": 0
+                        }
+                    }
                 },
                 "SERVIDOR-RS-05": {
                     "idServidor": 23,
-                    "chamados": {}
+                    "chamados": {
+                        "52": {
+                            "id_alerta": 52,
+                            "componente": "DISCO",
+                            "valor": 470.0,
+                            "limite": 450.0,
+                            "severidade": "baixo",
+                            "issueKey": "KAN-H52",
+                            "status": "fechado",
+                            "abertura": "2026-05-21T07:00:00",
+                            "fechamento": "2026-05-22T06:00:00",
+                            "duracaoMinutos": 1380,
+                            "slaOk": 0
+                        }
+                    }
                 },
                 "SERVIDOR-RS-06": {
                     "idServidor": 24,
-                    "chamados": {}
+                    "chamados": {
+                        "49": {
+                            "id_alerta": 49,
+                            "componente": "DISCO",
+                            "valor": 477.0,
+                            "limite": 450.0,
+                            "severidade": "baixo",
+                            "issueKey": "KAN-H49",
+                            "status": "fechado",
+                            "abertura": "2026-05-15T08:00:00",
+                            "fechamento": "2026-05-16T07:00:00",
+                            "duracaoMinutos": 1380,
+                            "slaOk": 0
+                        }
+                    }
                 }
             },
-            "Zona C": {
+            "ZonaC": {
                 "QUANTIDADE_ABERTO": 0,
                 "MTTR_ZONA": 0,
+                "QTD_SERVIDORES": 3,
                 "SERVIDOR-RS-07": {
                     "idServidor": 25,
                     "chamados": {}

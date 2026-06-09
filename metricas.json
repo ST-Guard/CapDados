@@ -1,6 +1,6 @@
 {
     "Steam": {
-        "SP": {
+        "DC-SP-01": {
             "ZonaA": {
                 "SERVIDOR-SP-01": {
                     "tipo": "Web",
@@ -179,7 +179,7 @@
                 }
             }
         },
-        "RJ": {
+        "DC-RJ-01": {
             "ZonaA": {
                 "SERVIDOR-RJ-01": {
                     "tipo": "Web",
@@ -358,7 +358,7 @@
                 }
             }
         },
-        "RS": {
+        "DC-RS-01": {
             "ZonaA": {
                 "SERVIDOR-RS-01": {
                     "tipo": "Web",
