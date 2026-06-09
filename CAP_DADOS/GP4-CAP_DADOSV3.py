@@ -576,10 +576,10 @@ def capturaJson():
         if empresa not in estruturaGeral:
             estruturaGeral[empresa] = {}
 
-        if datacenter not in estruturaGeral[empresa]:
+        if regiao not in estruturaGeral[empresa]:
             estruturaGeral[empresa][regiao] = {}
 
-        if zona not in estruturaGeral[empresa][regiao]:
+        if datacenter not in estruturaGeral[empresa][regiao]:
             estruturaGeral[empresa][regiao][datacenter] = {}
 
         if zona not in estruturaGeral[empresa][regiao][datacenter]:
@@ -600,11 +600,12 @@ def capturaJson():
         estruturaGeral[empresa][regiao][datacenter][zona][servidor]["limites"][componente] = linha["limite"]
         estruturaGeral[empresa][regiao][datacenter][zona][servidor]["limiteIds"][componente] = linha["idComponente"]
         
-    if linha["nomeAnalista"] and linha["nomeAnalista"] not in [f["nome"] for f in estruturaGeral[empresa][regiao][datacenter][zona][servidor]["funcionarios"]]:
-        estruturaGeral[empresa][regiao][datacenter][zona][servidor]["funcionarios"].append({
-            "id": linha["idAnalista"],
-            "nome": linha["nomeAnalista"]
-        })
+        if (linha["nomeAnalista"] and linha["nomeAnalista"] not in [f["nome"] 
+            for f in estruturaGeral[empresa][regiao][datacenter][zona][servidor]["funcionarios"]]):
+                estruturaGeral[empresa][regiao][datacenter][zona][servidor]["funcionarios"].append({
+                    "id": linha["idAnalista"],
+                    "nome": linha["nomeAnalista"]
+                })
 
     geral_json = json.dumps(estruturaGeral, ensure_ascii=False, indent=4, default=str)
 
@@ -668,8 +669,7 @@ def capturaJson():
 
         
 
-        
-
+    
         for datacenter in datacenters:
 
             nome_datacenter = datacenter[1]

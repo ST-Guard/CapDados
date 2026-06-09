@@ -3,7 +3,7 @@
         "DC-SP-01": {
             "ZonaA": {
                 "QUANTIDADE_ABERTO": 0,
-                "MTTR_ZONA": "60.0000",
+                "MTTR_ZONA": "245.4545",
                 "QTD_SERVIDORES": 3,
                 "SERVIDOR-SP-01": {
                     "idServidor": 1,
@@ -34,6 +34,19 @@
                             "duracaoMinutos": 70,
                             "slaOk": 0
                         },
+                        "53": {
+                            "id_alerta": 53,
+                            "componente": "CPU",
+                            "valor": 95.0,
+                            "limite": 80.0,
+                            "severidade": "critico",
+                            "issueKey": "SIM-UP-001",
+                            "status": "fechado",
+                            "abertura": "2026-05-19T01:43:40",
+                            "fechamento": "2026-05-19T04:43:40",
+                            "duracaoMinutos": 180,
+                            "slaOk": 1
+                        },
                         "19": {
                             "id_alerta": 19,
                             "componente": "CPU",
@@ -63,6 +76,19 @@
                             "abertura": "2026-05-16T11:00:00",
                             "fechamento": "2026-05-16T12:30:00",
                             "duracaoMinutos": 90,
+                            "slaOk": 0
+                        },
+                        "54": {
+                            "id_alerta": 54,
+                            "componente": "CPU",
+                            "valor": 97.0,
+                            "limite": 80.0,
+                            "severidade": "critico",
+                            "issueKey": "SIM-UP-002",
+                            "status": "fechado",
+                            "abertura": "2026-05-27T01:43:40",
+                            "fechamento": "2026-05-27T11:43:40",
+                            "duracaoMinutos": 600,
                             "slaOk": 0
                         }
                     }
@@ -95,13 +121,26 @@
                             "fechamento": "2026-05-20T13:30:00",
                             "duracaoMinutos": 210,
                             "slaOk": 1
+                        },
+                        "55": {
+                            "id_alerta": 55,
+                            "componente": "CPU",
+                            "valor": 98.0,
+                            "limite": 80.0,
+                            "severidade": "critico",
+                            "issueKey": "SIM-UP-003",
+                            "status": "fechado",
+                            "abertura": "2026-05-31T01:43:40",
+                            "fechamento": "2026-06-01T01:43:40",
+                            "duracaoMinutos": 1440,
+                            "slaOk": 0
                         }
                     }
                 }
             },
             "ZonaB": {
                 "QUANTIDADE_ABERTO": 0,
-                "MTTR_ZONA": "90.0000",
+                "MTTR_ZONA": "667.5000",
                 "QTD_SERVIDORES": 3,
                 "SERVIDOR-SP-04": {
                     "idServidor": 4,
@@ -131,6 +170,19 @@
                             "fechamento": "2026-05-21T12:00:00",
                             "duracaoMinutos": 180,
                             "slaOk": 1
+                        },
+                        "56": {
+                            "id_alerta": 56,
+                            "componente": "CPU",
+                            "valor": 99.0,
+                            "limite": 80.0,
+                            "severidade": "critico",
+                            "issueKey": "SIM-UP-004",
+                            "status": "fechado",
+                            "abertura": "2026-06-03T01:43:40",
+                            "fechamento": "2026-06-04T17:43:40",
+                            "duracaoMinutos": 2400,
+                            "slaOk": 0
                         }
                     }
                 },
@@ -154,7 +206,7 @@
                             "id_alerta": 17,
                             "componente": "DISCO",
                             "valor": 475.0,
-                            "limite": 450.0,
+                            "limite": 80.0,
                             "severidade": "baixo",
                             "issueKey": "KAN-H17",
                             "status": "fechado",
@@ -172,7 +224,7 @@
                             "id_alerta": 22,
                             "componente": "DISCO",
                             "valor": 468.0,
-                            "limite": 450.0,
+                            "limite": 80.0,
                             "severidade": "baixo",
                             "issueKey": "KAN-H22",
                             "status": "fechado",
@@ -291,7 +343,7 @@
                             "id_alerta": 37,
                             "componente": "DISCO",
                             "valor": 469.0,
-                            "limite": 450.0,
+                            "limite": 80.0,
                             "severidade": "baixo",
                             "issueKey": "KAN-H37",
                             "status": "fechado",
@@ -309,7 +361,7 @@
                             "id_alerta": 34,
                             "componente": "DISCO",
                             "valor": 476.0,
-                            "limite": 450.0,
+                            "limite": 80.0,
                             "severidade": "baixo",
                             "issueKey": "KAN-H34",
                             "status": "fechado",
@@ -441,7 +493,7 @@
                             "id_alerta": 52,
                             "componente": "DISCO",
                             "valor": 470.0,
-                            "limite": 450.0,
+                            "limite": 80.0,
                             "severidade": "baixo",
                             "issueKey": "KAN-H52",
                             "status": "fechado",
@@ -459,7 +511,7 @@
                             "id_alerta": 49,
                             "componente": "DISCO",
                             "valor": 477.0,
-                            "limite": 450.0,
+                            "limite": 80.0,
                             "severidade": "baixo",
                             "issueKey": "KAN-H49",
                             "status": "fechado",
