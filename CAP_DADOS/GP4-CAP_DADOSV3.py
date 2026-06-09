@@ -600,7 +600,7 @@ def capturaJson():
         estruturaGeral[empresa][regiao][datacenter][zona][servidor]["limites"][componente] = linha["limite"]
         estruturaGeral[empresa][regiao][datacenter][zona][servidor]["limiteIds"][componente] = linha["idComponente"]
         
-    if linha["nomeAnalista"] and linha["nomeAnalista"] not in [f["nome"] for f in estruturaGeral[empresa][datacenter][zona][servidor]["funcionarios"]]:
+    if linha["nomeAnalista"] and linha["nomeAnalista"] not in [f["nome"] for f in estruturaGeral[empresa][regiao][datacenter][zona][servidor]["funcionarios"]]:
         estruturaGeral[empresa][regiao][datacenter][zona][servidor]["funcionarios"].append({
             "id": linha["idAnalista"],
             "nome": linha["nomeAnalista"]
