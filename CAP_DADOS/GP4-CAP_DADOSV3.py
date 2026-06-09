@@ -579,7 +579,7 @@ def capturaJson():
         if datacenter not in estruturaGeral[empresa]:
             estruturaGeral[empresa][regiao] = {}
 
-        if zona not in estruturaGeral[empresa][datacenter]:
+        if zona not in estruturaGeral[empresa][regiao]:
             estruturaGeral[empresa][regiao][datacenter] = {}
 
         if zona not in estruturaGeral[empresa][regiao][datacenter]:
