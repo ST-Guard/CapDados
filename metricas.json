@@ -1,6 +1,6 @@
 {
     "Steam": {
-        "São Paulo": {
+        "SP": {
             "DC-SP-01": {
                 "ZonaA": {
                     "SERVIDOR-SP-01": {
@@ -238,7 +238,7 @@
                 }
             }
         },
-        "Rio de Janeiro": {
+        "RJ": {
             "DC-RJ-01": {
                 "ZonaA": {
                     "SERVIDOR-RJ-01": {
@@ -488,7 +488,7 @@
                 }
             }
         },
-        "Rio Grande do Sul": {
+        "RS": {
             "DC-RS-01": {
                 "ZonaA": {
                     "SERVIDOR-RS-01": {

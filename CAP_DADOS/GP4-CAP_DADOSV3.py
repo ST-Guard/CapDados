@@ -585,6 +585,14 @@ def capturaJson():
         if zona not in estruturaGeral[empresa][regiao][datacenter]:
             estruturaGeral[empresa][regiao][datacenter][zona] = {}
 
+        print({
+            "empresa": empresa,
+            "regiao": regiao,
+            "datacenter": datacenter,
+            "zona": zona,
+            "servidor": servidor
+        })
+
 
         if servidor not in estruturaGeral[empresa][regiao][datacenter][zona]:
             estruturaGeral[empresa][regiao][datacenter][zona][servidor] = {
@@ -754,7 +762,6 @@ def capturaJson():
                             "QUANTIDADE_ABERTO": quantidade_alerta,
                             "MTTR_ZONA": mttr_m,
                             "QTD_SERVIDORES": qtd_servidores
-
                         }
 
                         for servidor in servidores:
