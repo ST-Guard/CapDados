@@ -699,10 +699,12 @@ def capturaJson():
 
                         query_mttr_zona = f"""
 SELECT z.nome, AVG(mttr_minutos) FROM zona z 
-JOIN servidor ON fkZona = z.idZona 
-JOIN registros_alertas ON fkRegistroServidor = idServidor WHERE z.idZona = {id_zona} GROUP BY z.nome;
+JOIN servidor ON fkZona = z.idZona  JOIN registros_alertas ON fkRegistroServidor = idServidor WHERE z.idZona = {id_zona} AND severidade like "critico" GROUP BY z.nome;
 
 """
+                        
+
+                        
                         cursor.execute(query_mttr_zona)
                         mttr = cursor.fetchall()
 
