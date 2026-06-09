@@ -1,6 +1,6 @@
 {
     "Steam": {
-        "DC-SP-01": {
+        "SP": {
             "Zona A": {
                 "QUANTIDADE_ABERTO": 0,
                 "MTTR_ZONA": "197.1429",
@@ -50,7 +50,7 @@
                 }
             }
         },
-        "DC-RJ-01": {
+        "RJ": {
             "Zona A": {
                 "QUANTIDADE_ABERTO": 0,
                 "MTTR_ZONA": "258.8889",
@@ -100,7 +100,7 @@
                 }
             }
         },
-        "DC-RS-01": {
+        "RS": {
             "Zona A": {
                 "QUANTIDADE_ABERTO": 0,
                 "MTTR_ZONA": "267.2222",

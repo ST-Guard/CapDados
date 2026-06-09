@@ -166,7 +166,7 @@ def dashServidor(dados, geral, bucket):
             "P99CPUTotal": calcular_p99(todos["CPU"]),
             "P99RAMTotal": calcular_p99(todos["RAM"]),
             "P99DISCOTotal": calcular_p99(todos["DISCO"]),
-            "P99REDETotal": calcular_p99(todos["REDE"])
+            "P99REDETotal": todos["REDE"]
         },
         "Servidores": resultado_servidores
     }
