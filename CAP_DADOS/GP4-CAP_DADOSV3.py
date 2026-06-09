@@ -504,7 +504,7 @@ def capturaJson():
             e.idEmpresa,
             e.razaoSocial AS empresa,
             r.idRegiao,
-            r.estado,
+            r.uf,
             r.cep,
             r.numero,
             r.estado,
@@ -567,7 +567,7 @@ def capturaJson():
     estruturaGeral = {}
     for linha in geral:
         empresa = linha["empresa"]
-        regiao = linha["estado"]
+        regiao = linha["uf"]
         datacenter = linha["datacenter"]
         zona = linha["zona"].replace(" ", "")
         servidor = linha["servidor"]

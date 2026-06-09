@@ -2,54 +2,730 @@
     "Steam": {
         "São Paulo": {
             "DC-SP-01": {
+                "ZonaA": {
+                    "SERVIDOR-SP-01": {
+                        "tipo": "Web",
+                        "estado": "Ativo",
+                        "idServidor": 1,
+                        "idDataCenter": 1,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 2,
+                                "nome": "Erick Analista"
+                            },
+                            {
+                                "id": 13,
+                                "nome": "Matheus"
+                            }
+                        ]
+                    },
+                    "SERVIDOR-SP-02": {
+                        "tipo": "DB",
+                        "estado": "Ativo",
+                        "idServidor": 2,
+                        "idDataCenter": 1,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 2,
+                                "nome": "Erick Analista"
+                            },
+                            {
+                                "id": 13,
+                                "nome": "Matheus"
+                            }
+                        ]
+                    },
+                    "SERVIDOR-SP-03": {
+                        "tipo": "App",
+                        "estado": "Ativo",
+                        "idServidor": 3,
+                        "idDataCenter": 1,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 2,
+                                "nome": "Erick Analista"
+                            },
+                            {
+                                "id": 13,
+                                "nome": "Matheus"
+                            }
+                        ]
+                    }
+                },
+                "ZonaB": {
+                    "SERVIDOR-SP-04": {
+                        "tipo": "Web",
+                        "estado": "Ativo",
+                        "idServidor": 4,
+                        "idDataCenter": 1,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 2,
+                                "nome": "Erick Analista"
+                            }
+                        ]
+                    },
+                    "SERVIDOR-SP-05": {
+                        "tipo": "DB",
+                        "estado": "Ativo",
+                        "idServidor": 5,
+                        "idDataCenter": 1,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 2,
+                                "nome": "Erick Analista"
+                            }
+                        ]
+                    },
+                    "SERVIDOR-SP-06": {
+                        "tipo": "App",
+                        "estado": "Ativo",
+                        "idServidor": 6,
+                        "idDataCenter": 1,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 2,
+                                "nome": "Erick Analista"
+                            }
+                        ]
+                    }
+                },
                 "ZonaC": {
+                    "SERVIDOR-SP-07": {
+                        "tipo": "Web",
+                        "estado": "Ativo",
+                        "idServidor": 7,
+                        "idDataCenter": 1,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 3,
+                                "nome": "Miguel Analista"
+                            }
+                        ]
+                    },
+                    "SERVIDOR-SP-08": {
+                        "tipo": "DB",
+                        "estado": "Ativo",
+                        "idServidor": 8,
+                        "idDataCenter": 1,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 3,
+                                "nome": "Miguel Analista"
+                            }
+                        ]
+                    },
                     "SERVIDOR-SP-09": {
                         "tipo": "App",
                         "estado": "Ativo",
                         "idServidor": 9,
                         "idDataCenter": 1,
                         "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
                             "REDE": 40.0
                         },
                         "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
                             "REDE": 4
                         },
-                        "funcionarios": []
+                        "funcionarios": [
+                            {
+                                "id": 3,
+                                "nome": "Miguel Analista"
+                            }
+                        ]
                     }
                 }
             }
         },
         "Rio de Janeiro": {
             "DC-RJ-01": {
+                "ZonaA": {
+                    "SERVIDOR-RJ-01": {
+                        "tipo": "Web",
+                        "estado": "Ativo",
+                        "idServidor": 10,
+                        "idDataCenter": 2,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 4,
+                                "nome": "Joana Analista"
+                            },
+                            {
+                                "id": 9,
+                                "nome": "Erick"
+                            },
+                            {
+                                "id": 10,
+                                "nome": "matheus"
+                            }
+                        ]
+                    },
+                    "SERVIDOR-RJ-02": {
+                        "tipo": "DB",
+                        "estado": "Ativo",
+                        "idServidor": 11,
+                        "idDataCenter": 2,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 4,
+                                "nome": "Joana Analista"
+                            },
+                            {
+                                "id": 9,
+                                "nome": "Erick"
+                            },
+                            {
+                                "id": 10,
+                                "nome": "matheus"
+                            }
+                        ]
+                    },
+                    "SERVIDOR-RJ-03": {
+                        "tipo": "App",
+                        "estado": "Ativo",
+                        "idServidor": 12,
+                        "idDataCenter": 2,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 4,
+                                "nome": "Joana Analista"
+                            },
+                            {
+                                "id": 9,
+                                "nome": "Erick"
+                            },
+                            {
+                                "id": 10,
+                                "nome": "matheus"
+                            }
+                        ]
+                    }
+                },
+                "ZonaB": {
+                    "SERVIDOR-RJ-04": {
+                        "tipo": "Web",
+                        "estado": "Ativo",
+                        "idServidor": 13,
+                        "idDataCenter": 2,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 4,
+                                "nome": "Joana Analista"
+                            }
+                        ]
+                    },
+                    "SERVIDOR-RJ-05": {
+                        "tipo": "DB",
+                        "estado": "Ativo",
+                        "idServidor": 14,
+                        "idDataCenter": 2,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 4,
+                                "nome": "Joana Analista"
+                            }
+                        ]
+                    },
+                    "SERVIDOR-RJ-06": {
+                        "tipo": "App",
+                        "estado": "Ativo",
+                        "idServidor": 15,
+                        "idDataCenter": 2,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 4,
+                                "nome": "Joana Analista"
+                            }
+                        ]
+                    }
+                },
                 "ZonaC": {
+                    "SERVIDOR-RJ-07": {
+                        "tipo": "Web",
+                        "estado": "Ativo",
+                        "idServidor": 16,
+                        "idDataCenter": 2,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 5,
+                                "nome": "Carlos Analista"
+                            }
+                        ]
+                    },
+                    "SERVIDOR-RJ-08": {
+                        "tipo": "DB",
+                        "estado": "Ativo",
+                        "idServidor": 17,
+                        "idDataCenter": 2,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 5,
+                                "nome": "Carlos Analista"
+                            }
+                        ]
+                    },
                     "SERVIDOR-RJ-09": {
                         "tipo": "App",
                         "estado": "Ativo",
                         "idServidor": 18,
                         "idDataCenter": 2,
                         "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
                             "REDE": 40.0
                         },
                         "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
                             "REDE": 4
                         },
-                        "funcionarios": []
+                        "funcionarios": [
+                            {
+                                "id": 5,
+                                "nome": "Carlos Analista"
+                            }
+                        ]
                     }
                 }
             }
         },
         "Rio Grande do Sul": {
             "DC-RS-01": {
+                "ZonaA": {
+                    "SERVIDOR-RS-01": {
+                        "tipo": "Web",
+                        "estado": "Ativo",
+                        "idServidor": 19,
+                        "idDataCenter": 3,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 6,
+                                "nome": "Fernanda Analista"
+                            },
+                            {
+                                "id": 11,
+                                "nome": "Erick"
+                            },
+                            {
+                                "id": 12,
+                                "nome": "Erick 2 "
+                            }
+                        ]
+                    },
+                    "SERVIDOR-RS-02": {
+                        "tipo": "DB",
+                        "estado": "Ativo",
+                        "idServidor": 20,
+                        "idDataCenter": 3,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 6,
+                                "nome": "Fernanda Analista"
+                            },
+                            {
+                                "id": 11,
+                                "nome": "Erick"
+                            },
+                            {
+                                "id": 12,
+                                "nome": "Erick 2 "
+                            }
+                        ]
+                    },
+                    "SERVIDOR-RS-03": {
+                        "tipo": "App",
+                        "estado": "Ativo",
+                        "idServidor": 21,
+                        "idDataCenter": 3,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 6,
+                                "nome": "Fernanda Analista"
+                            },
+                            {
+                                "id": 11,
+                                "nome": "Erick"
+                            },
+                            {
+                                "id": 12,
+                                "nome": "Erick 2 "
+                            }
+                        ]
+                    }
+                },
+                "ZonaB": {
+                    "SERVIDOR-RS-04": {
+                        "tipo": "Web",
+                        "estado": "Ativo",
+                        "idServidor": 22,
+                        "idDataCenter": 3,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 6,
+                                "nome": "Fernanda Analista"
+                            }
+                        ]
+                    },
+                    "SERVIDOR-RS-05": {
+                        "tipo": "DB",
+                        "estado": "Ativo",
+                        "idServidor": 23,
+                        "idDataCenter": 3,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 6,
+                                "nome": "Fernanda Analista"
+                            }
+                        ]
+                    },
+                    "SERVIDOR-RS-06": {
+                        "tipo": "App",
+                        "estado": "Ativo",
+                        "idServidor": 24,
+                        "idDataCenter": 3,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 6,
+                                "nome": "Fernanda Analista"
+                            }
+                        ]
+                    }
+                },
                 "ZonaC": {
+                    "SERVIDOR-RS-07": {
+                        "tipo": "Web",
+                        "estado": "Ativo",
+                        "idServidor": 25,
+                        "idDataCenter": 3,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 7,
+                                "nome": "Rafael Analista"
+                            }
+                        ]
+                    },
+                    "SERVIDOR-RS-08": {
+                        "tipo": "DB",
+                        "estado": "Ativo",
+                        "idServidor": 26,
+                        "idDataCenter": 3,
+                        "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
+                            "REDE": 40.0
+                        },
+                        "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
+                            "REDE": 4
+                        },
+                        "funcionarios": [
+                            {
+                                "id": 7,
+                                "nome": "Rafael Analista"
+                            }
+                        ]
+                    },
                     "SERVIDOR-RS-09": {
                         "tipo": "App",
                         "estado": "Ativo",
                         "idServidor": 27,
                         "idDataCenter": 3,
                         "limites": {
+                            "CPU": 80.0,
+                            "RAM": 16.0,
+                            "DISCO": 80.0,
                             "REDE": 40.0
                         },
                         "limiteIds": {
+                            "CPU": 1,
+                            "RAM": 2,
+                            "DISCO": 3,
                             "REDE": 4
                         },
                         "funcionarios": [
